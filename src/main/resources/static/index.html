@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Career Training</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <h1>AI Gamified Career Training Platform</h1>
+      <p>Train product and engineering interview skills with AI-generated quests.</p>
+    </header>
+
+    <section class="panel">
+      <h2>Quest Generator</h2>
+      <div class="row">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty">
+          <option value="BEGINNER">Beginner</option>
+          <option value="INTERMEDIATE" selected>Intermediate</option>
+          <option value="ADVANCED">Advanced</option>
+        </select>
+        <button id="generateBtn">Generate Quest</button>
+      </div>
+      <pre id="output">No quest generated yet.</pre>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

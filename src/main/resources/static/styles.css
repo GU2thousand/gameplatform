@@ -1,0 +1,82 @@
+:root {
+  --bg: #0e141b;
+  --surface: #17212b;
+  --line: #2a3947;
+  --text: #f4f7fb;
+  --subtle: #b7c4d4;
+  --accent: #37d6b2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 15% 20%, #1e2f3f 0%, transparent 45%),
+    radial-gradient(circle at 85% 70%, #203d35 0%, transparent 50%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 20px;
+}
+
+.hero h1 {
+  margin: 0 0 8px;
+  font-size: clamp(28px, 4vw, 44px);
+}
+
+.hero p {
+  margin: 0 0 24px;
+  color: var(--subtle);
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  backdrop-filter: blur(3px);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+label {
+  font-weight: 600;
+}
+
+select,
+button {
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0f1822;
+  color: var(--text);
+  padding: 8px 12px;
+}
+
+button {
+  border-color: var(--accent);
+  cursor: pointer;
+}
+
+pre {
+  margin-top: 16px;
+  background: #0b1119;
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
