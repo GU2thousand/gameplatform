@@ -23,7 +23,7 @@ Frontend UI (static starter / Vue-ready)
 -> REST API (Spring Boot)
 -> AI Orchestration Layer (pluggable client interfaces)
 -> LLM Provider (OpenAI / Azure in production)
--> Database (H2 local, MySQL profile for deployment)
+-> Database (H2 local, PostgreSQL/MySQL profiles for deployment)
 
 ### Current Backend Modules
 
@@ -48,6 +48,8 @@ Frontend UI (static starter / Vue-ready)
   - Submit answer and trigger evaluation.
 - `GET /api/user/{id}/progress`
   - Query progress, average score, weakest dimension, and recommendations.
+- `GET /actuator/health`
+  - Health endpoint for deployment health checks (Render-ready).
 
 ---
 
@@ -119,9 +121,88 @@ Default URL:
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=mysql
 ```
 
-MySQL configuration file:
+- PostgreSQL profile:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+```
+
+Profile config files:
 
 - `src/main/resources/application-mysql.yml`
+- `src/main/resources/application-postgres.yml`
+
+Actuator health check:
+
+- `http://localhost:8080/actuator/health`
+
+---
+
+## Deployment
+
+### Deployed on Render
+
+This project is ready to deploy on Render using the repository `Dockerfile`.
+
+- Runtime: `Docker`
+- Public URL: Render assigns a public URL after deployment (for example `https://<service>.onrender.com`)
+- Health check endpoint: `GET /actuator/health`
+
+Recommended Render health check path:
+
+- `/actuator/health`
+
+### Profile Switching
+
+Use Spring profiles to switch database/runtime configuration without changing code.
+
+- Local default (H2): no profile
+- MySQL: `SPRING_PROFILES_ACTIVE=mysql`
+- PostgreSQL: `SPRING_PROFILES_ACTIVE=postgres`
+
+Examples:
+
+```bash
+SPRING_PROFILES_ACTIVE=mysql java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
+```
+
+### External Config Support
+
+The application supports externalized configuration through standard Spring Boot mechanisms:
+
+- Environment variables (recommended on Render)
+- `SPRING_APPLICATION_JSON`
+- External config files via `SPRING_CONFIG_ADDITIONAL_LOCATION`
+
+Common environment variables:
+
+- `PORT` (used by the Docker startup command)
+- `SPRING_PROFILES_ACTIVE`
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+
+Example (Render + PostgreSQL):
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres
+SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:5432/<db>
+SPRING_DATASOURCE_USERNAME=<user>
+SPRING_DATASOURCE_PASSWORD=<password>
+```
+
+Example (Render + MySQL):
+
+```bash
+SPRING_PROFILES_ACTIVE=mysql
+SPRING_DATASOURCE_URL=jdbc:mysql://<host>:3306/<db>?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+SPRING_DATASOURCE_USERNAME=<user>
+SPRING_DATASOURCE_PASSWORD=<password>
+```
 
 ---
 
