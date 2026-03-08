@@ -4,6 +4,7 @@ import com.gamingplatform.ai.EvaluationAiClient;
 import com.gamingplatform.ai.EvaluationResult;
 import com.gamingplatform.entity.Challenge;
 import com.gamingplatform.entity.RubricDimension;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
+@ConditionalOnProperty(name = "app.ai.provider", havingValue = "local", matchIfMissing = true)
 public class HeuristicEvaluationAiClient implements EvaluationAiClient {
 
     private static final Pattern HEADING_PATTERN = Pattern.compile("(?m)^#{1,6}\\s+");

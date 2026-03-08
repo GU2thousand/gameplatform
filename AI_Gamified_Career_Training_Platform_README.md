@@ -21,8 +21,8 @@ The platform goals:
 
 Frontend UI (static starter / Vue-ready)
 -> REST API (Spring Boot)
--> AI Orchestration Layer (pluggable client interfaces)
--> LLM Provider (OpenAI / Azure in production)
+-> AI Orchestration Layer (local fallback or LangChain4j)
+-> LLM Provider (OpenAI via LangChain4j, configurable)
 -> Database (H2 local, PostgreSQL/MySQL profiles for deployment)
 
 ### Current Backend Modules
@@ -30,9 +30,11 @@ Frontend UI (static starter / Vue-ready)
 - `challenge generation`
   - Generates quests with context, constraints, acceptance criteria, and expected output format.
   - Supports difficulty levels: `BEGINNER`, `INTERMEDIATE`, `ADVANCED`.
+  - Can run in `local` template mode or `langchain4j` mode.
 - `evaluation and scoring`
   - Scores submissions on 5 rubric dimensions.
   - Uses weighted formula: `FinalScore = sum(weight_i * rubric_i_score)`.
+  - Can run in `local` heuristic mode or `langchain4j` evaluator mode.
 - `gamification`
   - Tracks XP and computes salary tier progression.
 - `recommendation`
@@ -48,6 +50,8 @@ Frontend UI (static starter / Vue-ready)
   - Submit answer and trigger evaluation.
 - `GET /api/user/{id}/progress`
   - Query progress, average score, weakest dimension, and recommendations.
+- `POST /api/debug/ai-mode`
+  - Inspect which AI provider and client implementation are currently active.
 - `GET /actuator/health`
   - Health endpoint for deployment health checks (Render-ready).
 
@@ -115,6 +119,7 @@ Default URL:
 ### Database Profiles
 
 - Default profile: in-memory `H2` (for local development)
+- AI provider default: `local` (template generation + heuristic evaluation)
 - MySQL profile:
 
 ```bash
@@ -127,14 +132,31 @@ Default URL:
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
 ```
 
+- LangChain4j + OpenAI mode:
+
+```bash
+APP_AI_PROVIDER=langchain4j OPENAI_API_KEY=<your_key> ./mvnw spring-boot:run
+```
+
+- LangChain4j profile:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=langchain4j
+```
+
 Profile config files:
 
 - `src/main/resources/application-mysql.yml`
 - `src/main/resources/application-postgres.yml`
+- `src/main/resources/application-langchain4j.yml`
 
 Actuator health check:
 
 - `http://localhost:8080/actuator/health`
+
+AI mode debug endpoint:
+
+- `POST http://localhost:8080/api/debug/ai-mode`
 
 ---
 
@@ -159,6 +181,7 @@ Use Spring profiles to switch database/runtime configuration without changing co
 - Local default (H2): no profile
 - MySQL: `SPRING_PROFILES_ACTIVE=mysql`
 - PostgreSQL: `SPRING_PROFILES_ACTIVE=postgres`
+- LangChain4j: `SPRING_PROFILES_ACTIVE=langchain4j`
 
 Examples:
 
@@ -168,6 +191,10 @@ SPRING_PROFILES_ACTIVE=mysql java -jar target/ai-gamified-career-platform-0.0.1-
 
 ```bash
 SPRING_PROFILES_ACTIVE=postgres java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres,langchain4j OPENAI_API_KEY=<your_key> java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
 ```
 
 ### External Config Support
@@ -181,6 +208,10 @@ The application supports externalized configuration through standard Spring Boot
 Common environment variables:
 
 - `PORT` (used by the Docker startup command)
+- `APP_AI_PROVIDER` (`local` or `langchain4j`)
+- `OPENAI_API_KEY` (required when `APP_AI_PROVIDER=langchain4j`)
+- `OPENAI_MODEL` (default `gpt-4o-mini`)
+- `OPENAI_BASE_URL` (optional; for compatible providers/proxies)
 - `SPRING_PROFILES_ACTIVE`
 - `SPRING_DATASOURCE_URL`
 - `SPRING_DATASOURCE_USERNAME`

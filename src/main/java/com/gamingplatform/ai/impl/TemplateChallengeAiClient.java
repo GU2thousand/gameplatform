@@ -3,6 +3,7 @@ package com.gamingplatform.ai.impl;
 import com.gamingplatform.ai.ChallengeAiClient;
 import com.gamingplatform.ai.GeneratedChallenge;
 import com.gamingplatform.entity.Difficulty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
+@ConditionalOnProperty(name = "app.ai.provider", havingValue = "local", matchIfMissing = true)
 public class TemplateChallengeAiClient implements ChallengeAiClient {
 
     private final AtomicInteger counter = new AtomicInteger(0);
