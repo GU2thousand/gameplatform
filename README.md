@@ -1,128 +1,81 @@
 # AI Gamified Career Training Platform
 
-An AI-powered interview training platform where users solve product and engineering challenges, receive structured feedback, and progress through salary-style levels.
+## 项目做什么
 
-## What This Project Solves
+这是一个面向产品经理和工程师面试训练的 AI 驱动平台。
 
-Most interview practice tools focus on short Q&A. This project targets more realistic workflow training:
+用户在平台上完成 AI 生成的实战挑战，例如：
 
-- Generate PM/SDE-style challenges such as PRD writing, system design, and API design
-- Evaluate submissions with rubric-based scoring
-- Turn scores into XP and salary-tier progression
-- Recommend interview prep topics based on weakest dimensions
+- PRD 撰写
+- 系统设计
+- API 设计
 
-## Current Stack
+系统会对用户提交的答案进行结构化评分，并根据结果完成：
 
-- Backend: Java 17, Spring Boot 3
-- API: Spring Web, Bean Validation
-- Persistence: Spring Data JPA
-- Database: H2, PostgreSQL, MySQL
-- AI Layer: local fallback mode or LangChain4j + OpenAI
-- Health Checks: Spring Boot Actuator
-- Deployment: Docker, Render-ready
+- rubric 维度打分
+- 反馈建议生成
+- XP 累积
+- 薪资等级晋级
+- 面试准备方向推荐
 
-## Architecture
+这个项目要解决的问题是：传统刷题平台过于碎片化，缺少接近真实 PM/SDE 工作流的任务训练和可执行反馈。
 
-Frontend UI (static starter)
--> REST API
--> AI orchestration layer
--> Local heuristic engine or LangChain4j/OpenAI
--> Relational database
+## 技术栈
 
-Core modules:
+后端：
+
+- Java 17
+- Spring Boot 3
+- Spring Web
+- Spring Data JPA
+- Bean Validation
+- Spring Boot Actuator
+
+数据库：
+
+- H2
+- PostgreSQL
+- MySQL
+
+AI 层：
+
+- LangChain4j
+- OpenAI
+- local fallback mode（无 API Key 时可本地演示）
+
+运行与部署：
+
+- Maven Wrapper
+- Docker
+- Docker Compose
+- Render
+
+## 系统架构
+
+整体链路：
+
+Frontend UI  
+-> REST API  
+-> AI orchestration layer  
+-> local heuristic engine / LangChain4j + OpenAI  
+-> relational database
+
+当前模块划分：
 
 - challenge generation
+  - 生成挑战题，包括背景、要求、约束、验收标准
 - submission evaluation
+  - 处理答案提交与评分
 - rubric scoring
-- XP and salary-tier progression
-- recommendation engine
-- deployment/debug tooling
+  - 按维度加权计算最终分数
+- gamification
+  - 管理 XP 与 salary tier progression
+- recommendation
+  - 根据弱项返回 interview prep 建议
+- deployment and debug
+  - 提供 health check、AI mode debug、profile 配置
 
-## Run Locally
-
-### 1. Run tests
-
-```bash
-./mvnw test
-```
-
-### 2. Fastest local mode: H2 + local AI
-
-```bash
-./mvnw spring-boot:run
-```
-
-Open:
-
-- `http://localhost:8080/`
-- `http://localhost:8080/actuator/health`
-- `http://localhost:8080/api/debug/ai-mode`
-
-### 3. PostgreSQL with Docker Compose
-
-Start PostgreSQL:
-
-```bash
-docker compose up -d postgres
-```
-
-Run the app against PostgreSQL:
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres \
-SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
-SPRING_DATASOURCE_USERNAME='gamingplatform' \
-SPRING_DATASOURCE_PASSWORD='gamingplatform' \
-./mvnw spring-boot:run
-```
-
-Note:
-
-- Docker Compose exposes PostgreSQL on host port `5433` by default
-- Change it with `POSTGRES_HOST_PORT` if needed
-
-### 4. PostgreSQL + LangChain4j
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres,langchain4j \
-SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
-SPRING_DATASOURCE_USERNAME='gamingplatform' \
-SPRING_DATASOURCE_PASSWORD='gamingplatform' \
-OPENAI_API_KEY='<your_key>' \
-OPENAI_MODEL='gpt-4o-mini' \
-./mvnw spring-boot:run
-```
-
-Verification:
-
-```bash
-curl http://localhost:8080/actuator/health
-curl http://localhost:8080/api/debug/ai-mode
-```
-
-## Configuration Modes
-
-- Default: `H2 + local AI`
-- `postgres`: PostgreSQL datasource
-- `mysql`: MySQL datasource
-- `langchain4j`: LangChain4j/OpenAI provider
-
-Useful env vars:
-
-- `SPRING_PROFILES_ACTIVE`
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `APP_AI_PROVIDER`
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-- `OPENAI_BASE_URL`
-
-Example env template:
-
-- `.env.example`
-
-## Main API Endpoints
+主要接口：
 
 - `POST /api/user`
 - `POST /api/challenge/generate`
@@ -132,42 +85,84 @@ Example env template:
 - `POST /api/debug/ai-mode`
 - `GET /actuator/health`
 
-## Deployment
+## 如何本地启动
 
-This repo is ready for Render deployment with the included `Dockerfile`.
+### 1. 环境要求
 
-Recommended production setup:
+- Java 17+
+- Docker（如果你要跑 PostgreSQL）
 
-- Runtime: Docker
-- Health check path: `/actuator/health`
-- Database: external PostgreSQL or MySQL
-- AI mode: `local` for demo or `langchain4j` with a real OpenAI key
-
-Example Render env vars:
+### 2. 安装依赖并运行测试
 
 ```bash
-SPRING_PROFILES_ACTIVE=postgres
-SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:5432/<db>
-SPRING_DATASOURCE_USERNAME=<user>
-SPRING_DATASOURCE_PASSWORD=<password>
-APP_AI_PROVIDER=local
+./mvnw test
 ```
 
-## Repo Files
+### 3. 最简单启动方式：H2 + local AI
 
-- `README.md`: GitHub homepage overview
-- `AI_Gamified_Career_Training_Platform_README.md`: detailed architecture and setup guide
-- `docker-compose.yml`: local PostgreSQL and app container setup
-- `.env.example`: local environment template
+```bash
+./mvnw spring-boot:run
+```
 
-## Status
+启动后访问：
 
-Current project state:
+- `http://localhost:8080/`
+- `http://localhost:8080/actuator/health`
+- `http://localhost:8080/api/debug/ai-mode`
 
-- local mode works
-- PostgreSQL profile works
-- LangChain4j integration is wired and profile-driven
-- health checks are exposed
-- debug endpoint shows the active AI mode
+说明：
 
-For a full LLM-backed flow, you still need a real `OPENAI_API_KEY`.
+- 默认数据库是 `H2`
+- 默认 AI provider 是 `local`
+
+### 4. 使用 PostgreSQL 本地启动
+
+先启动 PostgreSQL：
+
+```bash
+docker compose up -d postgres
+```
+
+再启动应用：
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres \
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
+SPRING_DATASOURCE_USERNAME='gamingplatform' \
+SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+./mvnw spring-boot:run
+```
+
+说明：
+
+- `docker-compose.yml` 默认把 PostgreSQL 暴露在宿主机 `5433`
+
+### 5. 使用 PostgreSQL + LangChain4j 启动
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres,langchain4j \
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
+SPRING_DATASOURCE_USERNAME='gamingplatform' \
+SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+OPENAI_API_KEY='your_openai_key' \
+OPENAI_MODEL='gpt-4o-mini' \
+./mvnw spring-boot:run
+```
+
+启动后可用下面的接口确认当前模式：
+
+```bash
+curl http://localhost:8080/api/debug/ai-mode
+```
+
+如果返回里包含以下内容，说明 LangChain4j 已生效：
+
+- `provider = langchain4j`
+- `challengeClient = LangChain4jChallengeAiClient`
+- `evaluationClient = LangChain4jEvaluationAiClient`
+
+## 补充说明
+
+- 详细设计与部署说明见 `AI_Gamified_Career_Training_Platform_README.md`
+- 本地环境变量模板见 `.env.example`
+- 本地 PostgreSQL 配置见 `docker-compose.yml`
