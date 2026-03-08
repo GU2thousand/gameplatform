@@ -6,6 +6,7 @@ import com.gamingplatform.config.LangChain4jOpenAiProperties;
 import com.gamingplatform.dto.AiModeDebugResponse;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,8 +34,17 @@ public class DebugController {
         this.openAiProperties = openAiProperties;
     }
 
+    @GetMapping("/ai-mode")
+    public AiModeDebugResponse aiModeGet() {
+        return buildResponse();
+    }
+
     @PostMapping("/ai-mode")
-    public AiModeDebugResponse aiMode() {
+    public AiModeDebugResponse aiModePost() {
+        return buildResponse();
+    }
+
+    private AiModeDebugResponse buildResponse() {
         return new AiModeDebugResponse(
                 environment.getProperty("app.ai.provider", "local"),
                 challengeAiClient.getClass().getSimpleName(),

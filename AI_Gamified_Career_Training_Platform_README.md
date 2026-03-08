@@ -52,6 +52,8 @@ Frontend UI (static starter / Vue-ready)
   - Query progress, average score, weakest dimension, and recommendations.
 - `POST /api/debug/ai-mode`
   - Inspect which AI provider and client implementation are currently active.
+- `GET /api/debug/ai-mode`
+  - Same as above, but browser-friendly for local verification.
 - `GET /actuator/health`
   - Health endpoint for deployment health checks (Render-ready).
 
@@ -106,6 +108,12 @@ Relationship summary:
 ./mvnw test
 ```
 
+### Run Local H2 + Local AI
+
+```bash
+./mvnw spring-boot:run
+```
+
 ### Run the Application
 
 ```bash
@@ -157,6 +165,72 @@ Actuator health check:
 AI mode debug endpoint:
 
 - `POST http://localhost:8080/api/debug/ai-mode`
+- `GET http://localhost:8080/api/debug/ai-mode`
+
+### Run Local PostgreSQL with Docker Compose
+
+Start PostgreSQL only:
+
+```bash
+docker compose up -d postgres
+```
+
+Run the app locally against PostgreSQL:
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres \
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
+SPRING_DATASOURCE_USERNAME='gamingplatform' \
+SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+./mvnw spring-boot:run
+```
+
+Run the full stack in Docker:
+
+```bash
+docker compose up --build
+```
+
+Run PostgreSQL + LangChain4j mode:
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres,langchain4j \
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
+SPRING_DATASOURCE_USERNAME='gamingplatform' \
+SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+OPENAI_API_KEY='<your_key>' \
+./mvnw spring-boot:run
+```
+
+### Local Verification
+
+Health check:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+AI mode:
+
+```bash
+curl http://localhost:8080/api/debug/ai-mode
+```
+
+Create a user:
+
+```bash
+curl -X POST http://localhost:8080/api/user \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo_user_1"}'
+```
+
+Generate a challenge:
+
+```bash
+curl -X POST http://localhost:8080/api/challenge/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"difficulty":"INTERMEDIATE"}'
+```
 
 ---
 
@@ -212,6 +286,9 @@ Common environment variables:
 - `OPENAI_API_KEY` (required when `APP_AI_PROVIDER=langchain4j`)
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
 - `OPENAI_BASE_URL` (optional; for compatible providers/proxies)
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
 - `SPRING_PROFILES_ACTIVE`
 - `SPRING_DATASOURCE_URL`
 - `SPRING_DATASOURCE_USERNAME`

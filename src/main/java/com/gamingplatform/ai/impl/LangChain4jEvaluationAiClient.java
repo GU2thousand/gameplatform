@@ -8,7 +8,6 @@ import com.gamingplatform.entity.Challenge;
 import com.gamingplatform.entity.RubricDimension;
 import com.gamingplatform.exception.InvalidAiOutputException;
 import dev.langchain4j.model.chat.ChatModel;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
@@ -19,7 +18,6 @@ import java.util.Map;
 
 @Component
 @Primary
-@ConditionalOnBean(ChatModel.class)
 @ConditionalOnProperty(name = "app.ai.provider", havingValue = "langchain4j")
 public class LangChain4jEvaluationAiClient implements EvaluationAiClient {
 

@@ -7,7 +7,6 @@ import com.gamingplatform.ai.GeneratedChallenge;
 import com.gamingplatform.entity.Difficulty;
 import com.gamingplatform.exception.InvalidAiOutputException;
 import dev.langchain4j.model.chat.ChatModel;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
@@ -18,7 +17,6 @@ import java.util.Locale;
 
 @Component
 @Primary
-@ConditionalOnBean(ChatModel.class)
 @ConditionalOnProperty(name = "app.ai.provider", havingValue = "langchain4j")
 public class LangChain4jChallengeAiClient implements ChallengeAiClient {
 
