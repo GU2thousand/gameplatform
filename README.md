@@ -1,4 +1,5 @@
 # AI Gamified Career Training Platform
+<img width="1209" height="926" alt="52121773002743_ pic" src="https://github.com/user-attachments/assets/1242cc46-d777-45ef-aaad-84ccfa45ec7a" />
 
 ## 项目做什么
 
