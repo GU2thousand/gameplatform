@@ -1,11 +1,14 @@
 package com.gamingplatform.ai.impl;
 
 import com.gamingplatform.ai.ChallengeAiClient;
+import com.gamingplatform.ai.ChallengeGenerationInput;
 import com.gamingplatform.ai.GeneratedChallenge;
 import com.gamingplatform.entity.Difficulty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -113,9 +116,142 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
     );
 
     @Override
-    public GeneratedChallenge generate(Difficulty difficulty) {
+    public GeneratedChallenge generate(ChallengeGenerationInput input) {
+        Difficulty difficulty = input == null ? Difficulty.INTERMEDIATE : input.resolvedDifficulty();
         List<GeneratedChallenge> candidates = BANK.getOrDefault(difficulty, BANK.get(Difficulty.INTERMEDIATE));
         int index = Math.floorMod(counter.getAndIncrement(), candidates.size());
-        return candidates.get(index);
+        GeneratedChallenge base = candidates.get(index);
+
+        if (input == null || !input.hasCustomPrompt()) {
+            return base;
+        }
+
+        return new GeneratedChallenge(
+                buildTitle(base, input),
+                difficulty,
+                buildContext(base.context(), input),
+                mergeSection(base.requirements(), derivedRequirements(input), input.customRequirementsOrEmpty()),
+                mergeSection(base.constraints(), derivedConstraints(input), input.customConstraintsOrEmpty()),
+                mergeSection(base.acceptanceCriteria(), derivedAcceptanceCriteria(input), input.customAcceptanceCriteriaOrEmpty()),
+                base.expectedOutputFormat()
+        );
+    }
+
+    private String buildTitle(GeneratedChallenge base, ChallengeGenerationInput input) {
+        String challengeType = normalize(input.challengeType());
+        String focusGoal = normalize(input.focusGoal());
+        String businessContext = normalize(input.businessContext());
+
+        if (hasText(challengeType) && hasText(businessContext)) {
+            return challengeType + ": " + summarize(businessContext);
+        }
+        if (hasText(challengeType) && hasText(focusGoal)) {
+            return challengeType + ": " + focusGoal;
+        }
+        if (hasText(challengeType)) {
+            return "Custom " + challengeType + " Challenge";
+        }
+        if (hasText(focusGoal)) {
+            return base.title() + " - " + focusGoal;
+        }
+        return base.title();
+    }
+
+    private String buildContext(String baseContext, ChallengeGenerationInput input) {
+        List<String> sections = new ArrayList<>();
+
+        if (hasText(input.businessContext())) {
+            sections.add("User-specified business context: " + input.businessContext().trim());
+        }
+
+        List<String> setup = new ArrayList<>();
+        if (hasText(input.roleTrack())) {
+            setup.add("track=" + input.roleTrack().trim());
+        }
+        if (hasText(input.challengeType())) {
+            setup.add("type=" + input.challengeType().trim());
+        }
+        if (hasText(input.focusGoal())) {
+            setup.add("focus=" + input.focusGoal().trim());
+        }
+        if (!setup.isEmpty()) {
+            sections.add("Requested setup: " + String.join(", ", setup) + ".");
+        }
+
+        sections.add(baseContext);
+        return String.join(" ", sections);
+    }
+
+    private List<String> derivedRequirements(ChallengeGenerationInput input) {
+        List<String> derived = new ArrayList<>();
+        if (hasText(input.roleTrack())) {
+            derived.add("Tailor the response to the " + input.roleTrack().trim() + " interview track.");
+        }
+        if (hasText(input.challengeType())) {
+            derived.add("Structure the deliverable as a " + input.challengeType().trim() + " exercise.");
+        }
+        if (hasText(input.focusGoal())) {
+            derived.add("Explicitly address this requested focus: " + input.focusGoal().trim());
+        }
+        return derived;
+    }
+
+    private List<String> derivedConstraints(ChallengeGenerationInput input) {
+        List<String> derived = new ArrayList<>();
+        if (hasText(input.businessContext())) {
+            derived.add("Keep the proposal grounded in this business context: " + summarize(input.businessContext()));
+        }
+        return derived;
+    }
+
+    private List<String> derivedAcceptanceCriteria(ChallengeGenerationInput input) {
+        List<String> derived = new ArrayList<>();
+        if (hasText(input.focusGoal())) {
+            derived.add("The final answer clearly covers the requested focus area.");
+        }
+        if (!input.customRequirementsOrEmpty().isEmpty()) {
+            derived.add("The solution traces back to the user-provided custom requirements.");
+        }
+        return derived;
+    }
+
+    private List<String> mergeSection(List<String> base, List<String> derived, List<String> custom) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+        addAll(merged, base);
+        addAll(merged, derived);
+        addAll(merged, custom);
+        return new ArrayList<>(merged);
+    }
+
+    private void addAll(LinkedHashSet<String> target, List<String> values) {
+        if (values == null) {
+            return;
+        }
+        for (String value : values) {
+            String normalized = normalize(value);
+            if (normalized != null) {
+                target.add(normalized);
+            }
+        }
+    }
+
+    private String summarize(String value) {
+        String normalized = normalize(value);
+        if (normalized == null) {
+            return "";
+        }
+        return normalized.length() <= 72 ? normalized : normalized.substring(0, 69) + "...";
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private boolean hasText(String value) {
+        return normalize(value) != null;
     }
 }

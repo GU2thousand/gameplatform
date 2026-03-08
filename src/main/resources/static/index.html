@@ -4,27 +4,89 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Career Training</title>
+  <link rel="icon" href="data:," />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="app">
     <header class="hero">
+      <p class="eyebrow">AI-Powered Interview Training</p>
       <h1>AI Gamified Career Training Platform</h1>
-      <p>Train product and engineering interview skills with AI-generated quests.</p>
+      <p class="hero-copy">Generate a focused quest, then submit your answer in one compact workflow.</p>
     </header>
 
-    <section class="panel">
-      <h2>Quest Generator</h2>
-      <div class="row">
-        <label for="difficulty">Difficulty</label>
-        <select id="difficulty">
-          <option value="BEGINNER">Beginner</option>
-          <option value="INTERMEDIATE" selected>Intermediate</option>
-          <option value="ADVANCED">Advanced</option>
-        </select>
-        <button id="generateBtn">Generate Quest</button>
+    <section class="panel panel--wide">
+      <div class="section-head">
+        <div>
+          <h2>Quest Generator</h2>
+          <p>Use track, goal, business context, and custom requirements to shape the generated challenge.</p>
+        </div>
+        <button id="generateBtn" class="button button--primary">Generate Quest</button>
       </div>
-      <pre id="output">No quest generated yet.</pre>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>Difficulty</span>
+          <select id="difficulty">
+            <option value="BEGINNER">Beginner</option>
+            <option value="INTERMEDIATE" selected>Intermediate</option>
+            <option value="ADVANCED">Advanced</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Track</span>
+          <select id="roleTrack">
+            <option value="">General</option>
+            <option value="PM">PM</option>
+            <option value="SDE">SDE</option>
+            <option value="PM + SDE">PM + SDE</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Challenge Type</span>
+          <input id="challengeType" type="text" placeholder="System Design, PRD, API Design" />
+        </label>
+
+        <label class="field">
+          <span>Focus Goal</span>
+          <input id="focusGoal" type="text" placeholder="Latency reduction, tradeoff clarity, edge cases" />
+        </label>
+
+        <label class="field field--full">
+          <span>Business Context</span>
+          <textarea id="businessContext" rows="4" placeholder="Describe the product, users, business pressure, or operational problem you want the quest to target."></textarea>
+        </label>
+
+        <label class="field">
+          <span>Custom Requirements</span>
+          <textarea id="customRequirements" rows="5" placeholder="One requirement per line"></textarea>
+        </label>
+      </div>
+
+      <pre id="challengeOutput" class="markdown-output"># No quest yet
+
+Generate a quest to see a clean challenge brief here.</pre>
+    </section>
+
+    <section class="panel panel--submit">
+      <div class="section-head">
+        <div>
+          <h2>Submit Answer</h2>
+          <p>Send the latest generated challenge and your response through the evaluator.</p>
+        </div>
+        <button id="submitBtn" class="button">Submit Answer</button>
+      </div>
+
+      <label class="field">
+        <span>Answer</span>
+        <textarea id="submissionAnswer" rows="10" placeholder="Write your PRD, system design, API design, or tradeoff analysis here. Minimum 30 characters."></textarea>
+      </label>
+
+      <pre id="submissionOutput" class="markdown-output"># No submission yet
+
+Submit an answer to see the evaluation summary here.</pre>
     </section>
   </main>
 

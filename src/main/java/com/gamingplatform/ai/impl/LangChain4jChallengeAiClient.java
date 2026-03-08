@@ -3,6 +3,7 @@ package com.gamingplatform.ai.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamingplatform.ai.ChallengeAiClient;
+import com.gamingplatform.ai.ChallengeGenerationInput;
 import com.gamingplatform.ai.GeneratedChallenge;
 import com.gamingplatform.entity.Difficulty;
 import com.gamingplatform.exception.InvalidAiOutputException;
@@ -29,9 +30,9 @@ public class LangChain4jChallengeAiClient implements ChallengeAiClient {
     }
 
     @Override
-    public GeneratedChallenge generate(Difficulty difficulty) {
-        Difficulty requested = difficulty == null ? Difficulty.INTERMEDIATE : difficulty;
-        String raw = chatModel.chat(buildPrompt(requested));
+    public GeneratedChallenge generate(ChallengeGenerationInput input) {
+        Difficulty requested = input == null ? Difficulty.INTERMEDIATE : input.resolvedDifficulty();
+        String raw = chatModel.chat(buildPrompt(requested, input));
 
         try {
             JsonNode root = objectMapper.readTree(LangChain4jJsonSupport.extractJsonObject(raw));
@@ -50,11 +51,20 @@ public class LangChain4jChallengeAiClient implements ChallengeAiClient {
         }
     }
 
-    private String buildPrompt(Difficulty difficulty) {
+    private String buildPrompt(Difficulty difficulty, ChallengeGenerationInput input) {
         return """
                 You are a senior Product Manager creating a realistic challenge for an AI gamified PM/SDE training platform.
                 
                 Generate ONE challenge for difficulty: %s
+
+                Requested customization:
+                - roleTrack: %s
+                - challengeType: %s
+                - focusGoal: %s
+                - businessContext: %s
+                - additionalRequirements: %s
+                - additionalConstraints: %s
+                - additionalAcceptanceCriteria: %s
                 
                 Return ONLY valid JSON (no markdown, no code fences) using this exact schema:
                 {
@@ -71,9 +81,20 @@ public class LangChain4jChallengeAiClient implements ChallengeAiClient {
                 - Keep it realistic for product + engineering collaboration.
                 - Include concrete scale, latency, or operational constraints.
                 - difficulty must exactly equal requested difficulty.
+                - If customization fields are provided, reflect them materially in the title, context, and lists.
+                - Preserve the intent of any additional requirements, constraints, and acceptance criteria.
                 - Each list must contain at least 3 items.
                 - expectedOutputFormat should be Markdown.
-                """.formatted(difficulty.name());
+                """.formatted(
+                difficulty.name(),
+                textOrDefault(input == null ? null : input.roleTrack()),
+                textOrDefault(input == null ? null : input.challengeType()),
+                textOrDefault(input == null ? null : input.focusGoal()),
+                textOrDefault(input == null ? null : input.businessContext()),
+                listOrDefault(input == null ? List.of() : input.customRequirementsOrEmpty()),
+                listOrDefault(input == null ? List.of() : input.customConstraintsOrEmpty()),
+                listOrDefault(input == null ? List.of() : input.customAcceptanceCriteriaOrEmpty())
+        );
     }
 
     private String readText(JsonNode root, String field) {
@@ -110,5 +131,13 @@ public class LangChain4jChallengeAiClient implements ChallengeAiClient {
         } catch (IllegalArgumentException ex) {
             return fallback;
         }
+    }
+
+    private String textOrDefault(String value) {
+        return value == null || value.isBlank() ? "none" : value.trim();
+    }
+
+    private String listOrDefault(List<String> values) {
+        return values == null || values.isEmpty() ? "[]" : values.toString();
     }
 }

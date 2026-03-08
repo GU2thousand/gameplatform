@@ -19,6 +19,14 @@
 - 薪资等级晋级
 - 面试准备方向推荐
 
+当前静态前端已经支持：
+
+- Quest Generator
+- Submit Answer
+- 自动创建当前会话用户（前端隐式调用）
+- 自定义 challenge 输入
+- 以 Markdown 形式展示 challenge brief 和 evaluation summary
+
 这个项目要解决的问题是：传统刷题平台过于碎片化，缺少接近真实 PM/SDE 工作流的任务训练和可执行反馈。
 
 ## 技术栈
@@ -65,6 +73,7 @@ Frontend UI
 
 - challenge generation
   - 生成挑战题，包括背景、要求、约束、验收标准
+  - 支持用户输入 `track`、`challengeType`、`focusGoal`、`businessContext`
 - submission evaluation
   - 处理答案提交与评分
 - rubric scoring
@@ -115,6 +124,7 @@ Frontend UI
 
 - 默认数据库是 `H2`
 - 默认 AI provider 是 `local`
+- 首页现在是简化后的双面板流程：`Quest Generator -> Submit Answer`
 
 ### 4. 使用 PostgreSQL 本地启动
 
@@ -161,6 +171,25 @@ curl http://localhost:8080/api/debug/ai-mode
 - `provider = langchain4j`
 - `challengeClient = LangChain4jChallengeAiClient`
 - `evaluationClient = LangChain4jEvaluationAiClient`
+
+### 6. 验证自定义 challenge 输入
+
+```bash
+curl -X POST http://localhost:8080/api/challenge/generate \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "difficulty":"INTERMEDIATE",
+    "roleTrack":"PM + SDE",
+    "challengeType":"API Design",
+    "focusGoal":"latency reduction and rollout safety",
+    "businessContext":"A fintech app is seeing slow balance lookups during market open.",
+    "customRequirements":["Include rollout metrics and monitoring checkpoints."],
+    "customConstraints":["Must stay under 150ms p95."],
+    "customAcceptanceCriteria":["Explain how success will be measured after rollout."]
+  }'
+```
+
+如果返回的 `title/context/requirements/constraints/acceptanceCriteria` 中包含这些自定义信息，说明前后端自定义生成链路已经生效。
 
 ## 补充说明
 

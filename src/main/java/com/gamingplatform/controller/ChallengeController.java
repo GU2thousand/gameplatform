@@ -1,9 +1,9 @@
 package com.gamingplatform.controller;
 
+import com.gamingplatform.ai.ChallengeGenerationInput;
 import com.gamingplatform.dto.ChallengeGenerateRequest;
 import com.gamingplatform.dto.ChallengeResponse;
 import com.gamingplatform.entity.Challenge;
-import com.gamingplatform.entity.Difficulty;
 import com.gamingplatform.service.ChallengeService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,9 +22,25 @@ public class ChallengeController {
 
     @PostMapping("/generate")
     public ChallengeResponse generate(@RequestBody(required = false) ChallengeGenerateRequest request) {
-        Difficulty difficulty = request == null ? Difficulty.INTERMEDIATE : request.getDifficulty();
-        Challenge challenge = challengeService.generate(difficulty);
+        Challenge challenge = challengeService.generate(toGenerationInput(request));
         return toResponse(challenge);
+    }
+
+    private ChallengeGenerationInput toGenerationInput(ChallengeGenerateRequest request) {
+        if (request == null) {
+            return new ChallengeGenerationInput(null, null, null, null, null, null, null, null);
+        }
+
+        return new ChallengeGenerationInput(
+                request.getDifficulty(),
+                request.getRoleTrack(),
+                request.getChallengeType(),
+                request.getFocusGoal(),
+                request.getBusinessContext(),
+                request.getCustomRequirements(),
+                request.getCustomConstraints(),
+                request.getCustomAcceptanceCriteria()
+        );
     }
 
     private ChallengeResponse toResponse(Challenge challenge) {

@@ -19,7 +19,7 @@ The platform goals:
 
 ### High-Level Flow
 
-Frontend UI (static starter / Vue-ready)
+Frontend UI (static trainer dashboard / Vue-ready)
 -> REST API (Spring Boot)
 -> AI Orchestration Layer (local fallback or LangChain4j)
 -> LLM Provider (OpenAI via LangChain4j, configurable)
@@ -30,6 +30,7 @@ Frontend UI (static starter / Vue-ready)
 - `challenge generation`
   - Generates quests with context, constraints, acceptance criteria, and expected output format.
   - Supports difficulty levels: `BEGINNER`, `INTERMEDIATE`, `ADVANCED`.
+  - Accepts custom user input such as role track, challenge type, focus goal, business context, and custom lists.
   - Can run in `local` template mode or `langchain4j` mode.
 - `evaluation and scoring`
   - Scores submissions on 5 rubric dimensions.
@@ -56,6 +57,13 @@ Frontend UI (static starter / Vue-ready)
   - Same as above, but browser-friendly for local verification.
 - `GET /actuator/health`
   - Health endpoint for deployment health checks (Render-ready).
+
+### Current Static Frontend Flow
+
+- Generate custom quest with business context and custom requirements
+- Submit answer for evaluation against the latest generated quest
+- Auto-create a lightweight session user behind the scenes
+- Render both the quest brief and evaluation summary as clean Markdown documents for humans
 
 ---
 
@@ -229,7 +237,16 @@ Generate a challenge:
 ```bash
 curl -X POST http://localhost:8080/api/challenge/generate \
   -H 'Content-Type: application/json' \
-  -d '{"difficulty":"INTERMEDIATE"}'
+  -d '{
+    "difficulty":"INTERMEDIATE",
+    "roleTrack":"PM + SDE",
+    "challengeType":"API Design",
+    "focusGoal":"latency reduction and rollout safety",
+    "businessContext":"A fintech app is seeing slow balance lookups during market open.",
+    "customRequirements":["Include rollout metrics and monitoring checkpoints."],
+    "customConstraints":["Must stay under 150ms p95."],
+    "customAcceptanceCriteria":["Explain how success will be measured after rollout."]
+  }'
 ```
 
 ---
@@ -356,6 +373,6 @@ curl http://localhost:8080/api/user/1/progress
 
 - Replace heuristic evaluator with production LLM orchestrator (LangChain4j/OpenAI/Azure)
 - Async evaluation queue for high throughput
-- Full Vue 3 + Pinia + Axios frontend integration
+- Replace the current static dashboard with a full Vue 3 + Pinia + Axios frontend
 - Leaderboard and advanced progression mechanics
 - Multi-agent evaluation and bias calibration

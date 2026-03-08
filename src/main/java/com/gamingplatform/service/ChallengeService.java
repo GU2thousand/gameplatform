@@ -1,9 +1,9 @@
 package com.gamingplatform.service;
 
 import com.gamingplatform.ai.ChallengeAiClient;
+import com.gamingplatform.ai.ChallengeGenerationInput;
 import com.gamingplatform.ai.GeneratedChallenge;
 import com.gamingplatform.entity.Challenge;
-import com.gamingplatform.entity.Difficulty;
 import com.gamingplatform.exception.InvalidAiOutputException;
 import com.gamingplatform.repository.ChallengeRepository;
 import org.springframework.stereotype.Service;
@@ -23,9 +23,8 @@ public class ChallengeService {
     }
 
     @Transactional
-    public Challenge generate(Difficulty difficulty) {
-        Difficulty resolvedDifficulty = difficulty == null ? Difficulty.INTERMEDIATE : difficulty;
-        GeneratedChallenge generated = challengeAiClient.generate(resolvedDifficulty);
+    public Challenge generate(ChallengeGenerationInput input) {
+        GeneratedChallenge generated = challengeAiClient.generate(input);
         validateGeneratedChallenge(generated);
 
         Challenge challenge = new Challenge();
