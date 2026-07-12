@@ -1,6 +1,9 @@
 package com.gamingplatform.dto;
 
 import com.gamingplatform.entity.Difficulty;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,13 +11,30 @@ import java.util.List;
 public class ChallengeGenerateRequest {
 
     private Difficulty difficulty = Difficulty.INTERMEDIATE;
+
+    @Size(max = 80)
     private String roleTrack;
+
+    @Size(max = 120)
     private String challengeType;
+
+    @Size(max = 160)
     private String focusGoal;
+
+    @Size(max = 1200)
     private String businessContext;
-    private List<String> customRequirements = new ArrayList<>();
-    private List<String> customConstraints = new ArrayList<>();
-    private List<String> customAcceptanceCriteria = new ArrayList<>();
+
+    @Valid
+    @Size(max = 10)
+    private List<@NotBlank @Size(max = 400) String> customRequirements = new ArrayList<>();
+
+    @Valid
+    @Size(max = 10)
+    private List<@NotBlank @Size(max = 400) String> customConstraints = new ArrayList<>();
+
+    @Valid
+    @Size(max = 10)
+    private List<@NotBlank @Size(max = 400) String> customAcceptanceCriteria = new ArrayList<>();
 
     public Difficulty getDifficulty() {
         return difficulty;
@@ -97,10 +117,7 @@ public class ChallengeGenerateRequest {
 
         List<String> sanitized = new ArrayList<>();
         for (String value : values) {
-            String normalized = normalizeText(value);
-            if (normalized != null) {
-                sanitized.add(normalized);
-            }
+            sanitized.add(normalizeText(value));
         }
         return sanitized;
     }

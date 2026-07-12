@@ -1,39 +1,38 @@
 package com.gamingplatform.controller;
 
-import com.gamingplatform.dto.CreateUserRequest;
 import com.gamingplatform.dto.UserProgressResponse;
-import com.gamingplatform.dto.UserResponse;
-import com.gamingplatform.entity.UserProfile;
+import com.gamingplatform.security.CurrentUserService;
 import com.gamingplatform.service.ProgressService;
-import com.gamingplatform.service.UserService;
-import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/user")
+@Validated
 public class UserController {
-
-    private final UserService userService;
     private final ProgressService progressService;
+    private final CurrentUserService currentUser;
 
-    public UserController(UserService userService, ProgressService progressService) {
-        this.userService = userService;
+    public UserController(ProgressService progressService, CurrentUserService currentUser) {
         this.progressService = progressService;
+        this.currentUser = currentUser;
     }
 
-    @PostMapping
-    public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
-        UserProfile user = userService.create(request.getUsername());
-        return new UserResponse(user.getId(), user.getUsername(), user.getXp());
+    @GetMapping("/me/progress")
+    public UserProgressResponse myProgress() {
+        return progressService.getProgress(currentUser.requireUserId());
     }
 
     @GetMapping("/{id}/progress")
-    public UserProgressResponse progress(@PathVariable("id") Long userId) {
-        return progressService.getProgress(userId);
+    public UserProgressResponse progress(@PathVariable("id") @Positive Long userId) {
+        Long authenticated = currentUser.requireUserId();
+        if (!authenticated.equals(userId)) {
+            throw new com.gamingplatform.exception.NotFoundException("User not found: " + userId);
+        }
+        return progressService.getProgress(authenticated);
     }
 }

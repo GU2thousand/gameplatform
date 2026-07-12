@@ -1,0 +1,7 @@
+CREATE TABLE users (id BIGSERIAL PRIMARY KEY, username VARCHAR(100) NOT NULL UNIQUE, xp INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL);
+CREATE TABLE challenges (id BIGSERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, difficulty VARCHAR(255) NOT NULL, context VARCHAR(2000) NOT NULL, expected_output_format VARCHAR(64) NOT NULL, created_at TIMESTAMPTZ NOT NULL);
+CREATE TABLE challenge_requirements (challenge_id BIGINT NOT NULL REFERENCES challenges(id), requirement VARCHAR(500) NOT NULL);
+CREATE TABLE challenge_constraints (challenge_id BIGINT NOT NULL REFERENCES challenges(id), constraint_text VARCHAR(500) NOT NULL);
+CREATE TABLE challenge_acceptance_criteria (challenge_id BIGINT NOT NULL REFERENCES challenges(id), criterion VARCHAR(500) NOT NULL);
+CREATE TABLE submissions (id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id), challenge_id BIGINT NOT NULL REFERENCES challenges(id), answer VARCHAR(10000) NOT NULL, submitted_at TIMESTAMPTZ NOT NULL);
+CREATE TABLE evaluations (id BIGSERIAL PRIMARY KEY, submission_id BIGINT NOT NULL UNIQUE REFERENCES submissions(id), requirement_understanding DOUBLE PRECISION NOT NULL, logical_clarity DOUBLE PRECISION NOT NULL, technical_feasibility DOUBLE PRECISION NOT NULL, edge_case_coverage DOUBLE PRECISION NOT NULL, communication_structure DOUBLE PRECISION NOT NULL, final_score DOUBLE PRECISION NOT NULL, feedback VARCHAR(5000) NOT NULL, created_at TIMESTAMPTZ NOT NULL);

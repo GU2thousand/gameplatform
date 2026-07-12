@@ -1,198 +1,225 @@
-# AI Gamified Career Training Platform
-<img width="1209" height="926" alt="52121773002743_ pic" src="https://github.com/user-attachments/assets/1242cc46-d777-45ef-aaad-84ccfa45ec7a" />
+# Career Quest — AI-Powered Career Skills Training Platform
 
-## 项目做什么
+Career Quest provides realistic PRD, system design, and API design exercises for product managers, software engineers, and cross-functional professionals. Rather than serving as a one-off scoring demo, it delivers a complete training loop:
 
-这是一个面向产品经理和工程师面试训练的 AI 驱动平台。
+Generate a challenge → save a draft → receive an asynchronous evaluation → review evidence and scoring weights → retry the challenge → compare progress → continue training based on identified weaknesses.
 
-用户在平台上完成 AI 生成的实战挑战，例如：
+## Implemented Capabilities
 
-- PRD 撰写
-- 系统设计
-- API 设计
+### Accounts, Security, and Privacy
 
-系统会对用户提交的答案进行结构化评分，并根据结果完成：
+- BCrypt password hashing, server-side session authentication, logout, and session restoration after refresh
+- CSRF protection for all write operations; successful login rotates both the session ID and CSRF token
+- All business resources are authorized against the currently authenticated user; client-supplied `userId` values are never trusted
+- Consistent JSON responses for 401, 403, 404, 409, 429, and validation errors
+- Full account data export and deletion of the account with its associated training data
+- Secure one-time claiming of legacy passwordless accounts when an operations secret is enabled
+- CSP, frame-embedding protection, MIME sniffing protection, Referrer Policy, and Permissions Policy
 
-- rubric 维度打分
-- 反馈建议生成
-- XP 累积
-- 薪资等级晋级
-- 面试准备方向推荐
+### Complete Training Loop
 
-当前静态前端已经支持：
+- Three quick-start templates: product management, system design, and API design
+- Customizable difficulty, role, training focus, business context, requirements, constraints, and acceptance criteria
+- Restoration of the form, answer, challenge, and evaluation within the current browser tab after a refresh
+- Multiple attempts for the same challenge, challenge history, attempt history, and comparison between any two results
+- Separate tracking of completed challenges and total attempts
+- Current and longest training streaks, activity over the last seven days, score trends, and a seven-day training plan
+- Automatic generation of the next challenge based on the learner's weakest average rubric dimension
 
-- Quest Generator
-- Submit Answer
-- 自动创建当前会话用户（前端隐式调用）
-- 自定义 challenge 输入
-- 以 Markdown 形式展示 challenge brief 和 evaluation summary
+### Transparent Evaluation
 
-这个项目要解决的问题是：传统刷题平台过于碎片化，缺少接近真实 PM/SDE 工作流的任务训练和可执行反馈。
+- Five rubric dimensions: requirements understanding, logical clarity, technical feasibility, edge-case coverage, and communication structure
+- Different scoring weights for PRD, system design, and API design challenges
+- Total score, per-dimension scores, per-dimension weights, strengths, improvement areas, reference outline, and next steps
+- Explicit display of the evaluation source: `local`, `langchain4j`, or `fallback`
+- XP is awarded only for improvement over the previous best score on the same challenge, preventing repetitive score farming
 
-## 技术栈
+### Asynchronous Processing and Reliability
 
-后端：
+- `POST` submissions return 202 immediately; the frontend polls `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` states
+- Uniqueness is enforced by `user + Idempotency-Key`; identical requests return the same job without duplicate evaluation or XP
+- AI calls run outside database transactions; evaluation, XP, and completion status are committed atomically in a single transaction
+- Failure reasons are persisted; startup and scheduled recovery jobs resume unprocessed or timed-out submissions
+- Per-user/IP request rate limits, daily AI quotas, and Micrometer counters and timing metrics
+
+### Databases and Migrations
+
+- H2, PostgreSQL 16, and MySQL 8.4
+- Flyway V1 baseline and V2 upgrade migrations; schema changes no longer depend on automatic Hibernate DDL updates
+- PostgreSQL `TEXT`, MySQL `LONGTEXT`, and H2 `CLOB` support for long evaluation content
+- Safe backfilling of challenge ownership, evaluation source, weights, status, and idempotency fields for legacy data
+- Indexes for common history queries, status recovery, foreign-key collections, and ownership lookups
+- Formal Testcontainers coverage for both fresh and legacy PostgreSQL/MySQL migration paths
+
+### UI and Accessibility
+
+- Complete Chinese/English interface switching with persisted language preference
+- Desktop workspace with a sticky summary panel and automatic single-column layout on mobile
+- Clear four-step training stepper, presets, progress dashboard, history, and comparison areas
+- Keyboard navigation, skip links, status announcements, error alerts, native dialogs, and reduced-motion support
+- Offline status, draft protection, challenge copying, feedback downloads, data export, and deletion confirmation
+- Server-provided content is never rendered with `innerHTML`
+
+## Technology Stack
 
 - Java 17
-- Spring Boot 3
-- Spring Web
-- Spring Data JPA
-- Bean Validation
-- Spring Boot Actuator
+- Spring Boot 3.5.16
+- Spring Web, Security, Data JPA, Validation, and Actuator
+- Flyway
+- LangChain4j 1.17.2
+- H2, PostgreSQL, and MySQL
+- Vanilla HTML, CSS, and JavaScript
+- Maven Wrapper, Docker, and Docker Compose
+- Playwright, Axe, and Testcontainers
 
-数据库：
+## Quick Start
 
-- H2
-- PostgreSQL
-- MySQL
+Requirement: Java 17 or later.
 
-AI 层：
+~~~bash
+./mvnw clean verify
+./mvnw spring-boot:run
+~~~
 
-- LangChain4j
-- OpenAI
-- local fallback mode（无 API Key 时可本地演示）
+Open http://localhost:8080/.
 
-运行与部署：
+The default configuration uses an in-memory H2 database and local template/heuristic evaluation, so no OpenAI API key is required. H2 is suitable for development and demonstrations; use PostgreSQL or MySQL when accounts and training records must persist across restarts.
 
-- Maven Wrapper
-- Docker
-- Docker Compose
-- Render
+### Full PostgreSQL Stack
 
-## 系统架构
+~~~bash
+cp .env.example .env
+docker compose up --build
+~~~
 
-整体链路：
+The application is available at http://localhost:8080/, and PostgreSQL is exposed to the host on port 5433 by default.
 
-Frontend UI  
--> REST API  
--> AI orchestration layer  
--> local heuristic engine / LangChain4j + OpenAI  
--> relational database
+### LangChain4j + OpenAI
 
-当前模块划分：
+~~~bash
+APP_AI_PROVIDER=langchain4j \
+OPENAI_API_KEY=<your-key> \
+OPENAI_MODEL=gpt-4o-mini \
+./mvnw spring-boot:run
+~~~
 
-- challenge generation
-  - 生成挑战题，包括背景、要求、约束、验收标准
-  - 支持用户输入 `track`、`challengeType`、`focusGoal`、`businessContext`
-- submission evaluation
-  - 处理答案提交与评分
-- rubric scoring
-  - 按维度加权计算最终分数
-- gamification
-  - 管理 XP 与 salary tier progression
-- recommendation
-  - 根据弱项返回 interview prep 建议
-- deployment and debug
-  - 提供 health check、AI mode debug、profile 配置
+If the primary AI call fails, the application uses the local fallback and clearly marks the evaluation source in the result. When remote AI is enabled, challenge content and answers are sent to the configured model service; update the privacy notice to match your deployment context.
 
-主要接口：
+## Formal QA
 
-- `POST /api/user`
+### Backend and Fast Migration Tests
+
+~~~bash
+./mvnw clean verify
+~~~
+
+The current suite includes 29 H2/service/API integration tests covering authentication, CSRF, authorization, input boundaries, asynchronous success and failure, concurrent idempotency, XP, account export and deletion, legacy account claiming, shared legacy challenges, AI fallback, and fresh/legacy H2 migrations.
+
+### PostgreSQL/MySQL Container Migration Tests
+
+Local Docker is required:
+
+~~~bash
+./mvnw clean verify -Pcontainer-tests
+~~~
+
+This command starts PostgreSQL 16 and MySQL 8.4 containers on random ports and verifies:
+
+- Fresh V1 + V2 migration
+- Legacy baseline 1 → V2 migration
+- Flyway history, validation, and repeated migration with zero pending changes
+- Hibernate `ddl-auto=validate`
+- Unicode long text, preservation of legacy data, and ownership of single-user and shared challenges
+- Indexes, foreign keys, and unique constraints
+
+The default `verify` command does not start containers. CI explicitly enables `container-tests`, so a missing Docker environment cannot produce a false pass.
+
+### Browser, Mobile, and Accessibility Tests
+
+Start the application on any port, then run:
+
+~~~bash
+cd qa/e2e
+npm ci
+npm run install:browsers
+E2E_BASE_URL=http://127.0.0.1:18080 npm test
+~~~
+
+The three formal user journeys cover:
+
+- Registration, logout, login, and session restoration after refresh
+- Preset generation, draft restoration, two asynchronous evaluations, history, progress, and comparison
+- Chinese/English switching, short-answer validation, 503 feedback, horizontal overflow at 390px, and Axe scanning
+
+On failure, the suite preserves screenshots, video, traces, Axe JSON, and mobile overflow diagnostics.
+
+## Primary APIs
+
+### Authentication
+
+- `GET /api/auth/csrf`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `POST /api/auth/claim-legacy`
+
+### Training
+
 - `POST /api/challenge/generate`
-- `POST /api/submission`
-- `GET /api/user/{id}/progress`
-- `GET /api/debug/ai-mode`
-- `POST /api/debug/ai-mode`
+- `GET /api/challenges`
+- `GET /api/challenges/{id}`
+- `POST /api/training/next`
+
+### Asynchronous Evaluation and History
+
+- `POST /api/submissions`
+- `GET /api/submissions/{id}`
+- `GET /api/submissions`
+- `GET /api/challenges/{challengeId}/attempts`
+- `GET /api/attempts/compare?firstId=...&secondId=...`
+
+### Progress and Account
+
+- `GET /api/user/me/progress`
+- `GET /api/account/export`
+- `DELETE /api/account`
 - `GET /actuator/health`
 
-## 如何本地启动
+The browser client retrieves a CSRF token before every write request and sends it in the `X-XSRF-TOKEN` header. Never store passwords, session IDs, or tokens in `localStorage`.
 
-### 1. 环境要求
+## Key Configuration
 
-- Java 17+
-- Docker（如果你要跑 PostgreSQL）
+See `.env.example` for the complete template.
 
-### 2. 安装依赖并运行测试
+- `APP_AI_PROVIDER`: `local` or `langchain4j`
+- `APP_REQUESTS_PER_MINUTE`: per-endpoint request allowance per minute
+- `APP_AI_REQUESTS_PER_DAY`: daily AI allowance per user
+- `APP_SUBMISSION_RECOVERY_INTERVAL_MS`: asynchronous job recovery interval
+- `SESSION_COOKIE_SECURE`: must be `true` in HTTPS production environments
+- `MANAGEMENT_ENDPOINTS`: defaults to `health,info`; explicitly add `metrics` as required by your monitoring system
+- `APP_LEGACY_CLAIM_SECRET`: set a high-entropy secret only temporarily during the legacy-account migration window, then clear it
+- `FLYWAY_BASELINE_ON_MIGRATE`: defaults to `false`
 
-```bash
-./mvnw test
-```
+Before the first upgrade of an existing legacy Hibernate schema, back up the database and verify its structure. Set `FLYWAY_BASELINE_ON_MIGRATE=true` only temporarily for the initial migration, then restore it to `false`. Do not enable it for a new database.
 
-### 3. 最简单启动方式：H2 + local AI
+## Deployment Notes
 
-```bash
-./mvnw spring-boot:run
-```
+- Use PostgreSQL or MySQL in production; do not use in-memory H2
+- Serve the application only over HTTPS and set `SESSION_COOKIE_SECURE=true`
+- AI processing, rate-limit state, and quota state are currently single-instance implementations; multi-instance deployments should use a shared queue, shared rate-limit/quota storage, and distributed sessions
+- Define explicit retention and deletion periods for databases, user export files, and backups
+- The H2 Console and AI debug endpoints are disabled by default; enable them only temporarily in a trusted local environment
+- See `AI_Gamified_Career_Training_Platform_README.md` for detailed architecture and operations guidance
+- See `PRIVACY.md` for data-processing information
 
-启动后访问：
+## Current Validation Results
 
-- `http://localhost:8080/`
-- `http://localhost:8080/actuator/health`
-- `http://localhost:8080/api/debug/ai-mode`
-
-说明：
-
-- 默认数据库是 `H2`
-- 默认 AI provider 是 `local`
-- 首页现在是简化后的双面板流程：`Quest Generator -> Submit Answer`
-
-### 4. 使用 PostgreSQL 本地启动
-
-先启动 PostgreSQL：
-
-```bash
-docker compose up -d postgres
-```
-
-再启动应用：
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres \
-SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
-SPRING_DATASOURCE_USERNAME='gamingplatform' \
-SPRING_DATASOURCE_PASSWORD='gamingplatform' \
-./mvnw spring-boot:run
-```
-
-说明：
-
-- `docker-compose.yml` 默认把 PostgreSQL 暴露在宿主机 `5433`
-
-### 5. 使用 PostgreSQL + LangChain4j 启动
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres,langchain4j \
-SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
-SPRING_DATASOURCE_USERNAME='gamingplatform' \
-SPRING_DATASOURCE_PASSWORD='gamingplatform' \
-OPENAI_API_KEY='your_openai_key' \
-OPENAI_MODEL='gpt-4o-mini' \
-./mvnw spring-boot:run
-```
-
-启动后可用下面的接口确认当前模式：
-
-```bash
-curl http://localhost:8080/api/debug/ai-mode
-```
-
-如果返回里包含以下内容，说明 LangChain4j 已生效：
-
-- `provider = langchain4j`
-- `challengeClient = LangChain4jChallengeAiClient`
-- `evaluationClient = LangChain4jEvaluationAiClient`
-
-### 6. 验证自定义 challenge 输入
-
-```bash
-curl -X POST http://localhost:8080/api/challenge/generate \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "difficulty":"INTERMEDIATE",
-    "roleTrack":"PM + SDE",
-    "challengeType":"API Design",
-    "focusGoal":"latency reduction and rollout safety",
-    "businessContext":"A fintech app is seeing slow balance lookups during market open.",
-    "customRequirements":["Include rollout metrics and monitoring checkpoints."],
-    "customConstraints":["Must stay under 150ms p95."],
-    "customAcceptanceCriteria":["Explain how success will be measured after rollout."]
-  }'
-```
-
-如果返回的 `title/context/requirements/constraints/acceptanceCriteria` 中包含这些自定义信息，说明前后端自定义生成链路已经生效。
-
-## 补充说明
-
-- 详细设计与部署说明见 `AI_Gamified_Career_Training_Platform_README.md`
-- 本地环境变量模板见 `.env.example`
-- 本地 PostgreSQL 配置见 `docker-compose.yml`
+- Surefire: 29 tests, 0 failures
+- Failsafe/Testcontainers: 2 tests, 0 failures
+- Backend and database total: 31 tests, 0 failures
+- Playwright/Axe: all 3 real-browser journeys passed
+- 390px mobile viewport: no horizontal overflow
+- Axe: no serious or critical violations
+- PostgreSQL 16 and MySQL 8.4: fresh/legacy Flyway migrations and Hibernate validation passed
+- Production image: built successfully; in a standalone container, the health endpoint reported `UP`, the homepage returned 200, and the application ran as non-root UID 10001

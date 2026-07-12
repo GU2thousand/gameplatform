@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+        "app.debug.enabled=true",
         "app.ai.provider=langchain4j",
         "app.ai.langchain4j.openai.api-key=dummy-key",
         "app.ai.langchain4j.openai.model-name=gpt-4o-mini"

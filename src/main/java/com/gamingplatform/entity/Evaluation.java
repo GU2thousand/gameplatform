@@ -10,6 +10,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -43,8 +45,28 @@ public class Evaluation {
     @Column(nullable = false)
     private double finalScore;
 
-    @Column(nullable = false, length = 5000)
+    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
     private String feedback;
+
+    @Column(nullable = false, length = 32)
+    private String provider;
+
+    @Column(name = "strengths_json", nullable = false)
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    private String strengthsJson;
+
+    @Column(name = "improvements_json", nullable = false)
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    private String improvementsJson;
+
+    @Column(name = "example_outline", nullable = false)
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    private String exampleOutline;
+
+    @Column(name = "rubric_weights_json", nullable = false)
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    private String rubricWeightsJson;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -121,6 +143,26 @@ public class Evaluation {
     public void setFeedback(String feedback) {
         this.feedback = feedback;
     }
+
+    public String getProvider() { return provider; }
+
+    public void setProvider(String provider) { this.provider = provider; }
+
+    public String getStrengthsJson() { return strengthsJson; }
+
+    public void setStrengthsJson(String strengthsJson) { this.strengthsJson = strengthsJson; }
+
+    public String getImprovementsJson() { return improvementsJson; }
+
+    public void setImprovementsJson(String improvementsJson) { this.improvementsJson = improvementsJson; }
+
+    public String getExampleOutline() { return exampleOutline; }
+
+    public void setExampleOutline(String exampleOutline) { this.exampleOutline = exampleOutline; }
+
+    public String getRubricWeightsJson() { return rubricWeightsJson; }
+
+    public void setRubricWeightsJson(String rubricWeightsJson) { this.rubricWeightsJson = rubricWeightsJson; }
 
     public Instant getCreatedAt() {
         return createdAt;

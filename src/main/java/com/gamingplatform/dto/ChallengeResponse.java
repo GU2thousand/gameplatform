@@ -14,6 +14,10 @@ public record ChallengeResponse(
         List<String> constraints,
         List<String> acceptanceCriteria,
         String expectedOutputFormat,
+        String roleTrack,
+        String challengeType,
+        String focusGoal,
+        String generationProvider,
         Instant createdAt
 ) {
 }

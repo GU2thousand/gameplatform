@@ -10,11 +10,15 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 import java.time.Instant;
 
 @Entity
-@Table(name = "submissions")
+@Table(name = "submissions", uniqueConstraints =
+        @UniqueConstraint(name = "uk_submission_user_idempotency", columnNames = {"user_id", "idempotency_key"}))
 public class Submission {
 
     @Id
@@ -31,6 +35,25 @@ public class Submission {
 
     @Column(nullable = false, length = 10000)
     private String answer;
+
+    @Column(name = "answer_hash", nullable = false, length = 64)
+    private String answerHash;
+
+    @Column(name = "idempotency_key", nullable = false, length = 100)
+    private String idempotencyKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private SubmissionStatus status = SubmissionStatus.PENDING;
+
+    @Column(name = "error_message", length = 1000)
+    private String errorMessage;
+
+    @Column(name = "processing_started_at")
+    private Instant processingStartedAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
 
     @Column(nullable = false, updatable = false)
     private Instant submittedAt;
@@ -67,6 +90,30 @@ public class Submission {
     public void setAnswer(String answer) {
         this.answer = answer;
     }
+
+    public String getAnswerHash() { return answerHash; }
+
+    public void setAnswerHash(String answerHash) { this.answerHash = answerHash; }
+
+    public String getIdempotencyKey() { return idempotencyKey; }
+
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+
+    public SubmissionStatus getStatus() { return status; }
+
+    public void setStatus(SubmissionStatus status) { this.status = status; }
+
+    public String getErrorMessage() { return errorMessage; }
+
+    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+
+    public Instant getProcessingStartedAt() { return processingStartedAt; }
+
+    public void setProcessingStartedAt(Instant processingStartedAt) { this.processingStartedAt = processingStartedAt; }
+
+    public Instant getCompletedAt() { return completedAt; }
+
+    public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 
     public Instant getSubmittedAt() {
         return submittedAt;

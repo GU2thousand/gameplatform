@@ -1,378 +1,228 @@
-# AI-Powered Gamified Career Training Platform
+# Career Quest — Architecture and Operations
 
-## Overview
+## Product
 
-This project is an AI-driven gamified learning platform that simulates real-world product and engineering workflows.
+Career Quest is a full-stack practice loop for realistic product and engineering work. A user creates a PRD, system-design, or API-design challenge; submits multiple answers; receives explainable rubric feedback; compares attempts; and continues with a challenge targeted at the weakest skill.
 
-Users complete AI-generated challenges such as PRD drafting, system design, and API specification. Submissions are evaluated by an LLM-style scoring engine using structured rubrics. Performance determines progression across simulated salary tiers.
-
-The platform goals:
-
-- Simulate realistic PM/SDE collaboration
-- Provide structured evaluation feedback
-- Model skill growth through quantified scoring
-- Increase engagement via gamified progression
-
----
+The application is usable without a paid model. Local mode provides deterministic challenge templates and heuristic evaluation. LangChain4j mode calls the configured OpenAI-compatible service and falls back to the local evaluator when the primary call fails.
 
 ## Architecture
 
-### High-Level Flow
+Browser UI
 
-Frontend UI (static trainer dashboard / Vue-ready)
--> REST API (Spring Boot)
--> AI Orchestration Layer (local fallback or LangChain4j)
--> LLM Provider (OpenAI via LangChain4j, configurable)
--> Database (H2 local, PostgreSQL/MySQL profiles for deployment)
+→ Spring Security Session and CSRF boundary
 
-### Current Backend Modules
+→ REST controllers with ownership checks
 
-- `challenge generation`
-  - Generates quests with context, constraints, acceptance criteria, and expected output format.
-  - Supports difficulty levels: `BEGINNER`, `INTERMEDIATE`, `ADVANCED`.
-  - Accepts custom user input such as role track, challenge type, focus goal, business context, and custom lists.
-  - Can run in `local` template mode or `langchain4j` mode.
-- `evaluation and scoring`
-  - Scores submissions on 5 rubric dimensions.
-  - Uses weighted formula: `FinalScore = sum(weight_i * rubric_i_score)`.
-  - Can run in `local` heuristic mode or `langchain4j` evaluator mode.
-- `gamification`
-  - Tracks XP and computes salary tier progression.
-- `recommendation`
-  - Detects weakest rubric dimension and returns improvement tracks.
+→ challenge, submission, progress, account, and recommendation services
 
-### API Endpoints
+→ local or LangChain4j AI clients
 
-- `POST /api/user`
-  - Create user.
-- `POST /api/challenge/generate`
-  - Generate a quest.
-- `POST /api/submission`
-  - Submit answer and trigger evaluation.
-- `GET /api/user/{id}/progress`
-  - Query progress, average score, weakest dimension, and recommendations.
-- `POST /api/debug/ai-mode`
-  - Inspect which AI provider and client implementation are currently active.
-- `GET /api/debug/ai-mode`
-  - Same as above, but browser-friendly for local verification.
-- `GET /actuator/health`
-  - Health endpoint for deployment health checks (Render-ready).
+→ JPA repositories
 
-### Current Static Frontend Flow
+→ Flyway-managed H2, PostgreSQL, or MySQL
 
-- Generate custom quest with business context and custom requirements
-- Submit answer for evaluation against the latest generated quest
-- Auto-create a lightweight session user behind the scenes
-- Render both the quest brief and evaluation summary as clean Markdown documents for humans
+### Main components
 
----
+- SecurityConfig: Session authentication, BCrypt, CSRF cookies, JSON security errors, logout, and resource protection.
+- ChallengeService: custom challenge generation, AI fallback, ownership, provider attribution, and daily quota consumption.
+- SubmissionService: persisted asynchronous jobs, idempotency, history, and comparison.
+- SubmissionProcessor: claim/evaluate/complete state machine with transactional evaluation, XP, and status persistence.
+- SubmissionRecoveryService: startup and scheduled recovery of pending and stale processing jobs.
+- EvaluationEngine: validates AI output, applies challenge-specific rubric weights, and records evidence and provider.
+- ProgressService: distinct completed challenges, total attempts, score averages, streaks, seven-day activity, trends, and plan.
+- AccountService: credential-free export and ownership-safe cascade deletion, including shared legacy challenges.
+- RateLimitInterceptor and AiQuotaService: per-principal endpoint limits, daily AI quota, and Micrometer counters/timers.
 
-## Scoring and Progression
+## Security model
 
-### Rubric Dimensions
+Credentials are accepted only by register, login, and the optional migration claim endpoint. Passwords are stored as BCrypt hashes and never returned.
 
-- Requirement understanding
-- Logical clarity
-- Technical feasibility
-- Edge case coverage
-- Communication structure
+Authentication is server-side Session based. Every mutation, including register and login, requires a CSRF token from GET /api/auth/csrf. Authentication rotates the Session ID and CSRF token. The browser therefore requests a fresh token before every mutation.
 
-### Salary Tier Mapping
+Controllers derive identity from the authenticated Session. A compatibility userId field may still be deserialized in older payloads, but it never controls ownership.
 
-- Tier 1: `0-60` -> `Intern`
-- Tier 2: `60-75` -> `Junior Engineer`
-- Tier 3: `75-85` -> `Mid-Level`
-- Tier 4: `85-95` -> `Senior`
-- Tier 5: `95+` -> `Staff`
+Cross-account resources return 404 to avoid confirming that another user owns the identifier. Authentication and CSRF errors use consistent JSON bodies.
 
----
+Production HTTPS deployments must set SESSION_COOKIE_SECURE=true.
 
-## Data Model
+## Submission state machine
 
-Key tables/entities:
+POST /api/submissions returns HTTP 202 with a stable submission identifier.
 
-- `users`
-- `challenges`
-- `submissions`
-- `evaluations`
+PENDING → PROCESSING → COMPLETED
 
-Relationship summary:
+PENDING → PROCESSING → FAILED
 
-- `User -> Submission -> Evaluation`
-- `Challenge -> Submission`
+The AI call happens outside the write transaction. Evaluation persistence, incremental XP, and COMPLETED status happen in one transaction. A failure is stored as FAILED with a bounded error message.
 
----
+The unique user + idempotency key constraint prevents duplicate jobs. Reusing a key with the same challenge and answer returns the existing job. Reusing it with a different payload returns HTTP 409. Concurrent retries therefore cannot duplicate XP.
 
-## Setup Guide
+On startup and on a schedule, persisted PENDING jobs are resubmitted and stale PROCESSING jobs are returned to PENDING.
 
-### Prerequisites
+## Scoring
 
-- Java `17+`
-- Git
+The five dimensions are:
 
-### Install Dependencies and Run Tests
+- requirement understanding
+- logical clarity
+- technical feasibility
+- edge-case coverage
+- communication structure
 
-```bash
-./mvnw test
-```
+The default weights are 25%, 20%, 25%, 15%, and 15%. Product/PRD, system-design, and API-design challenges override those weights to emphasize the dimensions that matter for that task.
 
-### Run Local H2 + Local AI
+Each completed evaluation stores:
 
-```bash
+- scores and applied weights
+- final score and skill tier
+- overall feedback
+- strengths and priority improvements
+- example answer outline
+- next improvement track
+- local, langchain4j, fallback, or legacy provider
+
+The first completed attempt awards rounded score XP. Later attempts on the same challenge award only a positive improvement over the previous best.
+
+## Persistence and migrations
+
+Hibernate uses ddl-auto=validate. Flyway owns schema creation and upgrades.
+
+- db/migration/h2
+- db/migration/postgresql
+- db/migration/mysql
+
+V1 represents the legacy schema. V2 adds authentication, ownership, asynchronous state, idempotency, explainable evaluation data, long-text storage, and query indexes.
+
+Fresh databases run V1 and V2. Existing legacy schemas must be backed up and inspected before their one-time baseline migration:
+
+~~~bash
+FLYWAY_BASELINE_ON_MIGRATE=true ./mvnw spring-boot:run
+~~~
+
+After the successful upgrade, remove the flag. The safe default is false.
+
+Legacy accounts have no verifiable password. During a controlled migration window, an operator may configure a high-entropy APP_LEGACY_CLAIM_SECRET and call POST /api/auth/claim-legacy. Clear the secret after migration.
+
+Challenges used by exactly one legacy user are assigned to that user. Shared legacy challenges keep no owner and are accessible only to users with an existing submission. Deleting one participant preserves the other participant’s history.
+
+## Configuration
+
+Local H2 and local AI:
+
+~~~bash
 ./mvnw spring-boot:run
-```
+~~~
 
-### Run the Application
+PostgreSQL:
 
-```bash
-./mvnw spring-boot:run
-```
-
-Default URL:
-
-- [http://localhost:8080](http://localhost:8080)
-
-### Database Profiles
-
-- Default profile: in-memory `H2` (for local development)
-- AI provider default: `local` (template generation + heuristic evaluation)
-- MySQL profile:
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=mysql
-```
-
-- PostgreSQL profile:
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
-```
-
-- LangChain4j + OpenAI mode:
-
-```bash
-APP_AI_PROVIDER=langchain4j OPENAI_API_KEY=<your_key> ./mvnw spring-boot:run
-```
-
-- LangChain4j profile:
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=langchain4j
-```
-
-Profile config files:
-
-- `src/main/resources/application-mysql.yml`
-- `src/main/resources/application-postgres.yml`
-- `src/main/resources/application-langchain4j.yml`
-
-Actuator health check:
-
-- `http://localhost:8080/actuator/health`
-
-AI mode debug endpoint:
-
-- `POST http://localhost:8080/api/debug/ai-mode`
-- `GET http://localhost:8080/api/debug/ai-mode`
-
-### Run Local PostgreSQL with Docker Compose
-
-Start PostgreSQL only:
-
-```bash
-docker compose up -d postgres
-```
-
-Run the app locally against PostgreSQL:
-
-```bash
+~~~bash
 SPRING_PROFILES_ACTIVE=postgres \
-SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
-SPRING_DATASOURCE_USERNAME='gamingplatform' \
-SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/gamingplatform \
+SPRING_DATASOURCE_USERNAME=gamingplatform \
+SPRING_DATASOURCE_PASSWORD=gamingplatform \
 ./mvnw spring-boot:run
-```
+~~~
 
-Run the full stack in Docker:
+LangChain4j:
 
-```bash
-docker compose up --build
-```
-
-Run PostgreSQL + LangChain4j mode:
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres,langchain4j \
-SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
-SPRING_DATASOURCE_USERNAME='gamingplatform' \
-SPRING_DATASOURCE_PASSWORD='gamingplatform' \
-OPENAI_API_KEY='<your_key>' \
+~~~bash
+APP_AI_PROVIDER=langchain4j \
+OPENAI_API_KEY=<key> \
+OPENAI_MODEL=gpt-4o-mini \
 ./mvnw spring-boot:run
-```
+~~~
 
-### Local Verification
+Operational variables:
 
-Health check:
+- APP_REQUESTS_PER_MINUTE
+- APP_AI_REQUESTS_PER_DAY
+- APP_SUBMISSION_RECOVERY_INTERVAL_MS
+- SESSION_COOKIE_SECURE
+- MANAGEMENT_ENDPOINTS
+- APP_LEGACY_CLAIM_SECRET
+- FLYWAY_BASELINE_ON_MIGRATE
+- APP_DEBUG_ENABLED
+- H2_CONSOLE_ENABLED
 
-```bash
-curl http://localhost:8080/actuator/health
-```
+The default management exposure is health and info. Add metrics only when the deployment has an appropriate monitoring access boundary.
 
-AI mode:
+## API
 
-```bash
-curl http://localhost:8080/api/debug/ai-mode
-```
+Authentication:
 
-Create a user:
+- GET /api/auth/csrf
+- POST /api/auth/register
+- POST /api/auth/login
+- GET /api/auth/me
+- POST /api/auth/logout
+- POST /api/auth/claim-legacy
 
-```bash
-curl -X POST http://localhost:8080/api/user \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"demo_user_1"}'
-```
+Challenges:
 
-Generate a challenge:
+- POST /api/challenge/generate
+- GET /api/challenges
+- GET /api/challenges/{id}
+- POST /api/training/next
 
-```bash
-curl -X POST http://localhost:8080/api/challenge/generate \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "difficulty":"INTERMEDIATE",
-    "roleTrack":"PM + SDE",
-    "challengeType":"API Design",
-    "focusGoal":"latency reduction and rollout safety",
-    "businessContext":"A fintech app is seeing slow balance lookups during market open.",
-    "customRequirements":["Include rollout metrics and monitoring checkpoints."],
-    "customConstraints":["Must stay under 150ms p95."],
-    "customAcceptanceCriteria":["Explain how success will be measured after rollout."]
-  }'
-```
+Submissions:
 
----
+- POST /api/submissions
+- GET /api/submissions/{id}
+- GET /api/submissions
+- GET /api/challenges/{challengeId}/attempts
+- GET /api/attempts/compare
+
+Progress and account:
+
+- GET /api/user/me/progress
+- GET /api/account/export
+- DELETE /api/account
+- GET /actuator/health
+
+## Verification
+
+Fast suite:
+
+~~~bash
+./mvnw clean verify
+~~~
+
+PostgreSQL and MySQL migration suite:
+
+~~~bash
+./mvnw clean verify -Pcontainer-tests
+~~~
+
+Browser suite:
+
+~~~bash
+cd qa/e2e
+npm ci
+npm run install:browsers
+E2E_BASE_URL=http://127.0.0.1:18080 npm test
+~~~
+
+Current evidence:
+
+- 29 Surefire tests
+- 2 Failsafe/Testcontainers tests covering PostgreSQL 16 and MySQL 8.4, fresh and legacy paths
+- 3 Playwright journeys
+- Axe serious/critical violation count: zero
+- 390px horizontal overflow: zero
+
+CI runs the container profile, browser type-check, Chromium Playwright/Axe suite, and production Docker image build. Browser failures retain logs, screenshots, video, traces, Axe output, and overflow diagnostics.
 
 ## Deployment
 
-### Deployed on Render
+The Docker image is multi-stage and runs as UID 10001. Docker Compose provides PostgreSQL and the application.
 
-This project is ready to deploy on Render using the repository `Dockerfile`.
+For an internet deployment:
 
-- Runtime: `Docker`
-- Public URL: Render assigns a public URL after deployment (for example `https://<service>.onrender.com`)
-- Health check endpoint: `GET /actuator/health`
-
-Recommended Render health check path:
-
-- `/actuator/health`
-
-### Profile Switching
-
-Use Spring profiles to switch database/runtime configuration without changing code.
-
-- Local default (H2): no profile
-- MySQL: `SPRING_PROFILES_ACTIVE=mysql`
-- PostgreSQL: `SPRING_PROFILES_ACTIVE=postgres`
-- LangChain4j: `SPRING_PROFILES_ACTIVE=langchain4j`
-
-Examples:
-
-```bash
-SPRING_PROFILES_ACTIVE=mysql java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
-```
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
-```
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres,langchain4j OPENAI_API_KEY=<your_key> java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar
-```
-
-### External Config Support
-
-The application supports externalized configuration through standard Spring Boot mechanisms:
-
-- Environment variables (recommended on Render)
-- `SPRING_APPLICATION_JSON`
-- External config files via `SPRING_CONFIG_ADDITIONAL_LOCATION`
-
-Common environment variables:
-
-- `PORT` (used by the Docker startup command)
-- `APP_AI_PROVIDER` (`local` or `langchain4j`)
-- `OPENAI_API_KEY` (required when `APP_AI_PROVIDER=langchain4j`)
-- `OPENAI_MODEL` (default `gpt-4o-mini`)
-- `OPENAI_BASE_URL` (optional; for compatible providers/proxies)
-- `POSTGRES_DB`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `SPRING_PROFILES_ACTIVE`
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-
-Example (Render + PostgreSQL):
-
-```bash
-SPRING_PROFILES_ACTIVE=postgres
-SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:5432/<db>
-SPRING_DATASOURCE_USERNAME=<user>
-SPRING_DATASOURCE_PASSWORD=<password>
-```
-
-Example (Render + MySQL):
-
-```bash
-SPRING_PROFILES_ACTIVE=mysql
-SPRING_DATASOURCE_URL=jdbc:mysql://<host>:3306/<db>?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-SPRING_DATASOURCE_USERNAME=<user>
-SPRING_DATASOURCE_PASSWORD=<password>
-```
-
----
-
-## Quick API Usage
-
-### 1) Create User
-
-```bash
-curl -X POST http://localhost:8080/api/user \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"demo_user_1"}'
-```
-
-### 2) Generate Quest
-
-```bash
-curl -X POST http://localhost:8080/api/challenge/generate \
-  -H 'Content-Type: application/json' \
-  -d '{"difficulty":"INTERMEDIATE"}'
-```
-
-### 3) Submit Answer
-
-```bash
-curl -X POST http://localhost:8080/api/submission \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "userId": 1,
-    "challengeId": 1,
-    "answer": "# Architecture\nDesign API + queue + worker + retry + observability ..."
-  }'
-```
-
-### 4) Get Progress
-
-```bash
-curl http://localhost:8080/api/user/1/progress
-```
-
----
-
-## Future Improvements
-
-- Replace heuristic evaluator with production LLM orchestrator (LangChain4j/OpenAI/Azure)
-- Async evaluation queue for high throughput
-- Replace the current static dashboard with a full Vue 3 + Pinia + Axios frontend
-- Leaderboard and advanced progression mechanics
-- Multi-agent evaluation and bias calibration
+- use PostgreSQL or MySQL, not in-memory H2
+- terminate TLS and enable Secure cookies
+- keep debug and H2 Console disabled
+- use a persistent Session strategy when scaling beyond one application instance
+- replace in-memory rate-limit and quota counters with shared infrastructure for multiple instances
+- define retention, backup deletion, incident response, and AI-provider privacy terms
+- monitor health, latency, AI fallback/failure, queue age, submission outcomes, and rate-limit events
