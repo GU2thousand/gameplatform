@@ -1,0 +1,18 @@
+ALTER TABLE users ADD COLUMN password_hash VARCHAR(100);
+ALTER TABLE challenges ADD COLUMN created_by_id BIGINT, ADD COLUMN role_track VARCHAR(80), ADD COLUMN challenge_type VARCHAR(120), ADD COLUMN focus_goal VARCHAR(160), ADD COLUMN generation_provider VARCHAR(32), ADD CONSTRAINT fk_challenge_owner FOREIGN KEY (created_by_id) REFERENCES users(id);
+ALTER TABLE submissions ADD COLUMN answer_hash VARCHAR(64), ADD COLUMN idempotency_key VARCHAR(100), ADD COLUMN status VARCHAR(32) DEFAULT 'COMPLETED', ADD COLUMN error_message VARCHAR(1000), ADD COLUMN processing_started_at TIMESTAMP(6) NULL, ADD COLUMN completed_at TIMESTAMP(6) NULL;
+UPDATE submissions SET answer_hash = REPEAT('0', 64), idempotency_key = CONCAT('legacy-', id), status = 'COMPLETED', completed_at = submitted_at;
+ALTER TABLE submissions MODIFY answer_hash VARCHAR(64) NOT NULL, MODIFY idempotency_key VARCHAR(100) NOT NULL, MODIFY status VARCHAR(32) NOT NULL, ADD CONSTRAINT uk_submission_user_idempotency UNIQUE (user_id, idempotency_key);
+UPDATE challenges c JOIN (SELECT challenge_id, MIN(user_id) AS user_id FROM submissions GROUP BY challenge_id HAVING COUNT(DISTINCT user_id) = 1) owners ON owners.challenge_id = c.id SET c.created_by_id = owners.user_id;
+UPDATE challenges SET generation_provider = 'legacy' WHERE generation_provider IS NULL;
+ALTER TABLE evaluations MODIFY feedback LONGTEXT NOT NULL, ADD COLUMN provider VARCHAR(32), ADD COLUMN strengths_json LONGTEXT, ADD COLUMN improvements_json LONGTEXT, ADD COLUMN example_outline LONGTEXT, ADD COLUMN rubric_weights_json LONGTEXT;
+UPDATE evaluations SET provider = 'legacy', strengths_json = '[]', improvements_json = '[]', example_outline = 'Legacy evaluation', rubric_weights_json = '{"REQUIREMENT_UNDERSTANDING":0.25,"LOGICAL_CLARITY":0.20,"TECHNICAL_FEASIBILITY":0.25,"EDGE_CASE_COVERAGE":0.15,"COMMUNICATION_STRUCTURE":0.15}';
+ALTER TABLE evaluations MODIFY provider VARCHAR(32) NOT NULL, MODIFY strengths_json LONGTEXT NOT NULL, MODIFY improvements_json LONGTEXT NOT NULL, MODIFY example_outline LONGTEXT NOT NULL, MODIFY rubric_weights_json LONGTEXT NOT NULL;
+CREATE INDEX idx_challenges_created_by ON challenges(created_by_id, created_at);
+CREATE INDEX idx_submissions_user_submitted ON submissions(user_id, submitted_at);
+CREATE INDEX idx_submissions_challenge_user ON submissions(challenge_id, user_id, submitted_at);
+CREATE INDEX idx_submissions_status_started ON submissions(status, submitted_at);
+CREATE INDEX idx_submissions_user_status_challenge ON submissions(user_id, status, challenge_id);
+CREATE INDEX idx_challenge_requirements_challenge ON challenge_requirements(challenge_id);
+CREATE INDEX idx_challenge_constraints_challenge ON challenge_constraints(challenge_id);
+CREATE INDEX idx_challenge_criteria_challenge ON challenge_acceptance_criteria(challenge_id);

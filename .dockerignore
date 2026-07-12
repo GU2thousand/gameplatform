@@ -1,8 +1,9 @@
-.git
-.github
-target
-.idea
-.vscode
-.DS_Store
-*.iml
-*.log
+# Keep the Docker build context intentionally small. The image only needs the
+# Maven wrapper, project descriptor, and application source tree.
+*
+!.mvn
+!.mvn/**
+!src
+!src/**
+!mvnw
+!pom.xml

@@ -4,7 +4,6 @@ import com.gamingplatform.ai.ChallengeAiClient;
 import com.gamingplatform.ai.ChallengeGenerationInput;
 import com.gamingplatform.ai.GeneratedChallenge;
 import com.gamingplatform.entity.Difficulty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,8 +13,9 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
-@ConditionalOnProperty(name = "app.ai.provider", havingValue = "local", matchIfMissing = true)
 public class TemplateChallengeAiClient implements ChallengeAiClient {
+
+    private static final int MAX_TITLE_LENGTH = 255;
 
     private final AtomicInteger counter = new AtomicInteger(0);
 
@@ -126,14 +126,57 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
             return base;
         }
 
+        boolean hasCustomBusinessContext = hasText(input.businessContext());
+        List<String> baseRequirements = hasCustomBusinessContext
+                ? contextNeutralRequirements(difficulty)
+                : base.requirements();
+        List<String> baseConstraints = hasCustomBusinessContext
+                ? contextNeutralConstraints(difficulty)
+                : base.constraints();
+        List<String> baseAcceptanceCriteria = hasCustomBusinessContext
+                ? contextNeutralAcceptanceCriteria()
+                : base.acceptanceCriteria();
+
         return new GeneratedChallenge(
                 buildTitle(base, input),
                 difficulty,
                 buildContext(base.context(), input),
-                mergeSection(base.requirements(), derivedRequirements(input), input.customRequirementsOrEmpty()),
-                mergeSection(base.constraints(), derivedConstraints(input), input.customConstraintsOrEmpty()),
-                mergeSection(base.acceptanceCriteria(), derivedAcceptanceCriteria(input), input.customAcceptanceCriteriaOrEmpty()),
+                mergeSection(baseRequirements, derivedRequirements(input), input.customRequirementsOrEmpty()),
+                mergeSection(baseConstraints, derivedConstraints(input), input.customConstraintsOrEmpty()),
+                mergeSection(baseAcceptanceCriteria, derivedAcceptanceCriteria(input), input.customAcceptanceCriteriaOrEmpty()),
                 base.expectedOutputFormat()
+        );
+    }
+
+    private List<String> contextNeutralRequirements(Difficulty difficulty) {
+        List<String> requirements = new ArrayList<>(List.of(
+                "Translate the business problem into explicit functional and non-functional requirements.",
+                "Propose an implementation approach with clear component or API responsibilities.",
+                "Define rollout, monitoring, and failure-handling plans with measurable outcomes."
+        ));
+        if (difficulty == Difficulty.ADVANCED) {
+            requirements.add("Explain scaling, resilience, and cross-team operational ownership tradeoffs.");
+        }
+        return requirements;
+    }
+
+    private List<String> contextNeutralConstraints(Difficulty difficulty) {
+        List<String> constraints = new ArrayList<>(List.of(
+                "State assumptions explicitly where the business context does not provide exact numbers.",
+                "Preserve security, data integrity, and service reliability during rollout.",
+                "Use measurable latency, capacity, quality, or cost targets where relevant."
+        ));
+        if (difficulty == Difficulty.BEGINNER) {
+            constraints.add("Keep the initial solution small enough to deliver incrementally.");
+        }
+        return constraints;
+    }
+
+    private List<String> contextNeutralAcceptanceCriteria() {
+        return List.of(
+                "The proposal traces each recommendation to a stated requirement.",
+                "The response explains key tradeoffs and at least two realistic failure scenarios.",
+                "Success metrics and a safe validation or rollout plan are clearly defined."
         );
     }
 
@@ -142,19 +185,19 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
         String focusGoal = normalize(input.focusGoal());
         String businessContext = normalize(input.businessContext());
 
+        String title;
         if (hasText(challengeType) && hasText(businessContext)) {
-            return challengeType + ": " + summarize(businessContext);
+            title = challengeType + ": " + summarize(businessContext);
+        } else if (hasText(challengeType) && hasText(focusGoal)) {
+            title = challengeType + ": " + focusGoal;
+        } else if (hasText(challengeType)) {
+            title = "Custom " + challengeType + " Challenge";
+        } else if (hasText(focusGoal)) {
+            title = base.title() + " - " + focusGoal;
+        } else {
+            title = base.title();
         }
-        if (hasText(challengeType) && hasText(focusGoal)) {
-            return challengeType + ": " + focusGoal;
-        }
-        if (hasText(challengeType)) {
-            return "Custom " + challengeType + " Challenge";
-        }
-        if (hasText(focusGoal)) {
-            return base.title() + " - " + focusGoal;
-        }
-        return base.title();
+        return truncate(title, MAX_TITLE_LENGTH);
     }
 
     private String buildContext(String baseContext, ChallengeGenerationInput input) {
@@ -162,6 +205,8 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
 
         if (hasText(input.businessContext())) {
             sections.add("User-specified business context: " + input.businessContext().trim());
+        } else {
+            sections.add(baseContext);
         }
 
         List<String> setup = new ArrayList<>();
@@ -177,8 +222,6 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
         if (!setup.isEmpty()) {
             sections.add("Requested setup: " + String.join(", ", setup) + ".");
         }
-
-        sections.add(baseContext);
         return String.join(" ", sections);
     }
 
@@ -188,7 +231,7 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
             derived.add("Tailor the response to the " + input.roleTrack().trim() + " interview track.");
         }
         if (hasText(input.challengeType())) {
-            derived.add("Structure the deliverable as a " + input.challengeType().trim() + " exercise.");
+            derived.add("Use this exercise format for the deliverable: " + input.challengeType().trim() + ".");
         }
         if (hasText(input.focusGoal())) {
             derived.add("Explicitly address this requested focus: " + input.focusGoal().trim());
@@ -240,7 +283,11 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
         if (normalized == null) {
             return "";
         }
-        return normalized.length() <= 72 ? normalized : normalized.substring(0, 69) + "...";
+        return truncate(normalized, 72);
+    }
+
+    private String truncate(String value, int maxLength) {
+        return value.length() <= maxLength ? value : value.substring(0, maxLength - 3) + "...";
     }
 
     private String normalize(String value) {

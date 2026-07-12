@@ -1,95 +1,343 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Career Training</title>
+  <meta name="color-scheme" content="light" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'self'" />
+  <title>Career Quest · AI 职业训练</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <main class="app">
-    <header class="hero">
-      <p class="eyebrow">AI-Powered Interview Training</p>
-      <h1>AI Gamified Career Training Platform</h1>
-      <p class="hero-copy">Generate a focused quest, then submit your answer in one compact workflow.</p>
-    </header>
+  <a class="skip-link" href="#mainContent" data-i18n="skip">跳到训练工作区</a>
 
-    <section class="panel panel--wide">
-      <div class="section-head">
-        <div>
-          <h2>Quest Generator</h2>
-          <p>Use track, goal, business context, and custom requirements to shape the generated challenge.</p>
+  <div id="offlineBanner" class="offline-banner" role="status" hidden>
+    <span data-i18n="offline">当前离线。你的草稿已保留，恢复网络后可继续。</span>
+  </div>
+
+  <header class="topbar" aria-label="Primary">
+    <a class="brand" href="#mainContent" aria-label="Career Quest home">
+      <span aria-hidden="true">CQ</span>
+      <strong>Career Quest</strong>
+    </a>
+    <div class="topbar-actions">
+      <button id="localeToggle" class="text-button" type="button" data-testid="language-toggle" aria-label="Switch language">EN</button>
+      <span id="connectionState" class="connection-state" role="status">
+        <span class="connection-dot" aria-hidden="true"></span>
+        <span data-i18n="online">在线</span>
+      </span>
+      <div id="signedOutActions" class="auth-actions">
+        <button id="openAuthBtn" class="button button--small" type="button" data-testid="auth-open" data-i18n="loginRegister">登录 / 注册</button>
+      </div>
+      <div id="signedInActions" class="profile-menu" hidden>
+        <button id="profileMenuBtn" class="profile-trigger" type="button" aria-expanded="false" aria-controls="profileDropdown">
+          <span class="avatar" aria-hidden="true">U</span>
+          <span id="currentUsername">User</span>
+        </button>
+        <div id="profileDropdown" class="profile-dropdown" hidden>
+          <p><strong id="menuUsername">User</strong><br /><span id="menuXp">0 XP</span></p>
+          <button id="exportDataBtn" class="menu-action" type="button" data-i18n="exportData">导出我的数据</button>
+          <button id="deleteAccountBtn" class="menu-action menu-action--danger" type="button" data-i18n="deleteAccount">删除账号</button>
+          <button id="logoutBtn" class="menu-action" type="button" data-testid="auth-logout" data-i18n="logout">退出登录</button>
         </div>
-        <button id="generateBtn" class="button button--primary">Generate Quest</button>
       </div>
+    </div>
+  </header>
 
-      <div class="form-grid">
-        <label class="field">
-          <span>Difficulty</span>
-          <select id="difficulty">
-            <option value="BEGINNER">Beginner</option>
-            <option value="INTERMEDIATE" selected>Intermediate</option>
-            <option value="ADVANCED">Advanced</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Track</span>
-          <select id="roleTrack">
-            <option value="">General</option>
-            <option value="PM">PM</option>
-            <option value="SDE">SDE</option>
-            <option value="PM + SDE">PM + SDE</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Challenge Type</span>
-          <input id="challengeType" type="text" placeholder="System Design, PRD, API Design" />
-        </label>
-
-        <label class="field">
-          <span>Focus Goal</span>
-          <input id="focusGoal" type="text" placeholder="Latency reduction, tradeoff clarity, edge cases" />
-        </label>
-
-        <label class="field field--full">
-          <span>Business Context</span>
-          <textarea id="businessContext" rows="4" placeholder="Describe the product, users, business pressure, or operational problem you want the quest to target."></textarea>
-        </label>
-
-        <label class="field">
-          <span>Custom Requirements</span>
-          <textarea id="customRequirements" rows="5" placeholder="One requirement per line"></textarea>
-        </label>
+  <main id="mainContent" class="app">
+    <section class="hero" aria-labelledby="pageTitle">
+      <div>
+        <p class="eyebrow" data-i18n="eyebrow">AI 驱动的实战训练</p>
+        <h1 id="pageTitle" data-i18n="heroTitle">把每一次作答，变成看得见的进步</h1>
+        <p class="hero-copy" data-i18n="heroCopy">完成接近真实工作的任务，获得透明、可行动的反馈，再针对薄弱项继续训练。</p>
       </div>
-
-      <pre id="challengeOutput" class="markdown-output"># No quest yet
-
-Generate a quest to see a clean challenge brief here.</pre>
+      <div class="hero-note" aria-label="Product promise">
+        <strong data-i18n="heroNoteTitle">训练，不是猜薪资</strong>
+        <span data-i18n="heroNoteBody">结果展示技能等级、证据与下一步。</span>
+      </div>
     </section>
 
-    <section class="panel panel--submit">
-      <div class="section-head">
-        <div>
-          <h2>Submit Answer</h2>
-          <p>Send the latest generated challenge and your response through the evaluator.</p>
-        </div>
-        <button id="submitBtn" class="button">Submit Answer</button>
+    <nav class="stepper" aria-label="Training workflow">
+      <ol>
+        <li data-step="1" aria-current="step"><span>1</span><strong data-i18n="stepCreate">创建任务</strong></li>
+        <li data-step="2"><span>2</span><strong data-i18n="stepAnswer">作答</strong></li>
+        <li data-step="3"><span>3</span><strong data-i18n="stepReview">查看反馈</strong></li>
+        <li data-step="4"><span>4</span><strong data-i18n="stepImprove">继续提升</strong></li>
+      </ol>
+    </nav>
+
+    <div id="globalStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="workspace">
+      <div class="workspace-main">
+        <section class="panel panel--generator" aria-labelledby="generatorHeading">
+          <div class="section-head">
+            <div>
+              <p class="step-label" data-i18n="stepOne">第 1 步</p>
+              <h2 id="generatorHeading" data-i18n="generatorTitle">选择训练场景</h2>
+              <p data-i18n="generatorCopy">从一个快捷模板开始，或用三个核心选项定制任务。</p>
+            </div>
+          </div>
+
+          <div class="preset-grid" role="group" aria-label="Training presets">
+            <button class="preset-card" type="button" data-preset="pm" data-testid="preset-pm">
+              <span class="preset-icon" aria-hidden="true">PM</span>
+              <strong data-i18n="presetPmTitle">产品经理面试</strong>
+              <small data-i18n="presetPmCopy">PRD · 优先级 · 指标</small>
+            </button>
+            <button class="preset-card" type="button" data-preset="system" data-testid="preset-system-design">
+              <span class="preset-icon" aria-hidden="true">SD</span>
+              <strong data-i18n="presetSystemTitle">系统设计面试</strong>
+              <small data-i18n="presetSystemCopy">架构 · 扩展性 · 权衡</small>
+            </button>
+            <button class="preset-card" type="button" data-preset="api" data-testid="preset-api-design">
+              <span class="preset-icon" aria-hidden="true">API</span>
+              <strong data-i18n="presetApiTitle">API 设计训练</strong>
+              <small data-i18n="presetApiCopy">契约 · 错误 · 安全</small>
+            </button>
+          </div>
+
+          <form id="generateForm" novalidate>
+            <div class="form-grid form-grid--core">
+              <label class="field">
+                <span data-i18n="difficulty">难度</span>
+                <select id="difficulty" name="difficulty" required>
+                  <option value="BEGINNER" data-i18n="beginner">入门</option>
+                  <option value="INTERMEDIATE" selected data-i18n="intermediate">中级</option>
+                  <option value="ADVANCED" data-i18n="advanced">高级</option>
+                </select>
+              </label>
+              <label class="field">
+                <span data-i18n="track">岗位方向</span>
+                <select id="roleTrack" name="roleTrack">
+                  <option value="" data-i18n="general">综合</option>
+                  <option value="PM" data-i18n="productManagement">产品管理</option>
+                  <option value="SDE" data-i18n="softwareEngineering">软件工程</option>
+                  <option value="PM + SDE" data-i18n="pmSde">产品 + 工程</option>
+                </select>
+              </label>
+              <label class="field">
+                <span data-i18n="challengeType">任务类型</span>
+                <input id="challengeType" name="challengeType" type="text" maxlength="120" data-i18n-placeholder="challengePlaceholder" placeholder="例如：系统设计" autocomplete="off" />
+              </label>
+            </div>
+
+            <details id="advancedOptions" class="advanced-options">
+              <summary><span data-i18n="advancedOptions">高级定制</span><small data-i18n="advancedHint">可选：背景、目标、要求与约束</small></summary>
+              <div class="form-grid form-grid--advanced">
+                <label class="field field--full">
+                  <span data-i18n="focusGoal">训练重点</span>
+                  <input id="focusGoal" name="focusGoal" type="text" maxlength="160" data-i18n-placeholder="focusPlaceholder" placeholder="例如：延迟、权衡、边界情况" autocomplete="off" />
+                </label>
+                <label class="field field--full">
+                  <span data-i18n="businessContext">业务背景</span>
+                  <textarea id="businessContext" name="businessContext" rows="4" maxlength="1200" aria-describedby="businessContextHelp" data-i18n-placeholder="contextPlaceholder" placeholder="描述产品、用户或业务问题。"></textarea>
+                  <small id="businessContextHelp" class="field-hint" data-i18n="contextHelp">最多 1,200 字。</small>
+                </label>
+                <label class="field">
+                  <span data-i18n="customRequirements">自定义要求</span>
+                  <textarea id="customRequirements" name="customRequirements" rows="5" maxlength="4100" aria-describedby="requirementsHelp" data-i18n-placeholder="onePerLine" placeholder="每行一项"></textarea>
+                  <small id="requirementsHelp" class="field-hint" data-i18n="listHelp">每行一项，最多 10 项。</small>
+                </label>
+                <label class="field">
+                  <span data-i18n="customConstraints">自定义约束</span>
+                  <textarea id="customConstraints" name="customConstraints" rows="5" maxlength="4100" aria-describedby="constraintsHelp" data-i18n-placeholder="onePerLine" placeholder="每行一项"></textarea>
+                  <small id="constraintsHelp" class="field-hint" data-i18n="listHelp">每行一项，最多 10 项。</small>
+                </label>
+                <label class="field field--full">
+                  <span data-i18n="acceptanceCriteria">验收标准</span>
+                  <textarea id="customAcceptanceCriteria" name="customAcceptanceCriteria" rows="4" maxlength="4100" aria-describedby="criteriaHelp" data-i18n-placeholder="criteriaPlaceholder" placeholder="每行一条可衡量的成功标准"></textarea>
+                  <small id="criteriaHelp" class="field-hint" data-i18n="shortcutGenerate">最多 10 项 · Ctrl/⌘ + Enter 生成。</small>
+                </label>
+              </div>
+            </details>
+
+            <div class="form-actions">
+              <button id="generateBtn" class="button button--primary" type="submit" data-testid="generate" data-i18n="generate">生成训练任务</button>
+              <button id="nextWeaknessBtn" class="button button--secondary" type="button" data-testid="next-weakness" disabled data-i18n="nextWeakness">根据薄弱项出题</button>
+            </div>
+          </form>
+          <div id="challengeStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+        </section>
+
+        <section id="challengeSection" class="panel panel--challenge" aria-labelledby="challengeHeading">
+          <div class="section-head section-head--actions">
+            <div>
+              <p class="step-label" data-i18n="stepTwo">第 2 步</p>
+              <h2 id="challengeHeading" data-i18n="challengeBrief">任务简报</h2>
+            </div>
+            <div class="button-group">
+              <button id="copyChallengeBtn" class="button button--small" type="button" data-testid="copy-challenge" disabled data-i18n="copyChallenge">复制任务</button>
+              <button id="clearTrainingBtn" class="button button--small" type="button" disabled data-i18n="clearTraining">清空当前训练</button>
+            </div>
+          </div>
+          <article id="challengeOutput" class="result-card" aria-label="Generated challenge" tabindex="-1" data-testid="challenge">
+            <div class="empty-state">
+              <h3 data-i18n="noChallenge">还没有任务</h3>
+              <p data-i18n="noChallengeCopy">选择模板或设置选项，生成你的第一道训练题。</p>
+            </div>
+          </article>
+        </section>
+
+        <section id="answerSection" class="panel panel--answer" aria-labelledby="submissionHeading">
+          <form id="submissionForm" novalidate>
+            <div class="section-head section-head--actions">
+              <div>
+                <p class="step-label" data-i18n="stepThree">第 3 步</p>
+                <h2 id="submissionHeading" data-i18n="writeAnswer">提交你的方案</h2>
+                <p id="submissionGate" data-i18n="answerGate">生成任务后即可作答；失败时草稿仍会保留。</p>
+              </div>
+              <button id="exampleAnswerBtn" class="button button--small" type="button" data-testid="example-answer" disabled data-i18n="loadExample">载入示例结构</button>
+            </div>
+            <label class="field">
+              <span data-i18n="answer">你的答案</span>
+              <textarea id="submissionAnswer" name="submissionAnswer" rows="15" required minlength="30" maxlength="10000" aria-describedby="answerHelp answerCount" data-testid="answer" data-i18n-placeholder="answerPlaceholder" placeholder="写下你的 PRD、系统设计、API 设计或权衡分析。"></textarea>
+            </label>
+            <div class="field-meta">
+              <small id="answerHelp" class="field-hint" data-i18n="answerHelp">至少 30 字符 · Ctrl/⌘ + Enter 提交。</small>
+              <output id="answerCount" class="character-count" for="submissionAnswer">0 / 10,000</output>
+            </div>
+            <div class="form-actions">
+              <button id="submitBtn" class="button button--primary" type="submit" data-testid="submit" disabled data-i18n="submit">提交并评分</button>
+            </div>
+          </form>
+          <div id="submissionStatus" class="status" role="status" aria-live="polite" aria-atomic="true" data-testid="submission-status"></div>
+          <article id="submissionOutput" class="result-card" aria-label="Evaluation result" tabindex="-1" data-testid="evaluation">
+            <div class="empty-state">
+              <h3 data-i18n="noEvaluation">还没有反馈</h3>
+              <p data-i18n="noEvaluationCopy">提交答案后，这里会优先展示亮点、改进重点和示例结构。</p>
+            </div>
+          </article>
+          <div class="result-actions">
+            <button id="downloadFeedbackBtn" class="button button--small" type="button" disabled data-i18n="downloadFeedback">下载反馈</button>
+            <button id="retryChallengeBtn" class="button button--small" type="button" disabled data-i18n="retryChallenge">再次作答</button>
+          </div>
+        </section>
       </div>
 
-      <label class="field">
-        <span>Answer</span>
-        <textarea id="submissionAnswer" rows="10" placeholder="Write your PRD, system design, API design, or tradeoff analysis here. Minimum 30 characters."></textarea>
-      </label>
+      <aside class="workspace-aside" aria-label="Current training summary">
+        <div class="sticky-stack">
+          <section class="summary-card">
+            <p class="summary-kicker" data-i18n="currentTraining">当前训练</p>
+            <h2 id="summaryTitle" data-i18n="waitingChallenge">等待生成任务</h2>
+            <dl class="summary-list">
+              <div><dt data-i18n="track">岗位方向</dt><dd id="summaryTrack">—</dd></div>
+              <div><dt data-i18n="difficulty">难度</dt><dd id="summaryDifficulty">—</dd></div>
+              <div><dt data-i18n="attempts">尝试次数</dt><dd id="summaryAttempts">0</dd></div>
+              <div><dt data-i18n="bestScore">最佳成绩</dt><dd id="summaryBest">—</dd></div>
+            </dl>
+            <a class="summary-link" href="#answerSection" data-i18n="jumpAnswer">前往作答 →</a>
+          </section>
+          <section class="summary-card summary-card--tip">
+            <p class="summary-kicker" data-i18n="scoringTrust">评分说明</p>
+            <p data-i18n="scoringTrustCopy">不同任务使用不同 Rubric 权重。每次结果都会标明 AI 来源或本地降级。</p>
+          </section>
+        </div>
+      </aside>
+    </div>
 
-      <pre id="submissionOutput" class="markdown-output"># No submission yet
-
-Submit an answer to see the evaluation summary here.</pre>
+    <section id="progressSection" class="panel panel--progress" aria-labelledby="progressHeading" data-testid="progress">
+      <div class="section-head section-head--actions">
+        <div>
+          <p class="step-label" data-i18n="stepFour">第 4 步</p>
+          <h2 id="progressHeading" data-i18n="progressTitle">进步仪表盘</h2>
+          <p data-i18n="progressCopy">区分完成任务数与总尝试次数，关注趋势而不是单次分数。</p>
+        </div>
+        <button id="refreshProgressBtn" class="button button--small" type="button" disabled data-i18n="refresh">刷新</button>
+      </div>
+      <div id="progressStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+      <article id="progressOutput" class="result-card" aria-label="Training progress" tabindex="-1">
+        <div class="empty-state">
+          <h3 data-i18n="signInProgress">登录后查看长期进步</h3>
+          <p data-i18n="signInProgressCopy">连续训练、7 日计划、分数趋势和弱项都会集中展示。</p>
+        </div>
+      </article>
     </section>
+
+    <section id="historySection" class="panel panel--history" aria-labelledby="historyHeading" data-testid="history">
+      <div class="section-head section-head--actions">
+        <div>
+          <p class="step-label" data-i18n="historyLabel">训练记录</p>
+          <h2 id="historyHeading" data-i18n="historyTitle">任务与作答历史</h2>
+          <p data-i18n="historyCopy">展开同一道题的多次尝试，选择任意两次查看分数和维度变化。</p>
+        </div>
+        <button id="refreshHistoryBtn" class="button button--small" type="button" disabled data-i18n="refresh">刷新</button>
+      </div>
+      <div id="historyStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+      <div id="historyOutput" class="history-list">
+        <div class="empty-state">
+          <h3 data-i18n="noHistory">暂无训练记录</h3>
+          <p data-i18n="noHistoryCopy">完成第一次评分后，你的作答会出现在这里。</p>
+        </div>
+      </div>
+
+      <section class="compare-panel" aria-labelledby="compareHeading">
+        <div>
+          <p class="summary-kicker" data-i18n="compareLabel">进步对比</p>
+          <h3 id="compareHeading" data-i18n="compareTitle">选择两次已完成的作答</h3>
+        </div>
+        <div class="compare-controls">
+          <label class="field">
+            <span data-i18n="earlierAttempt">较早一次</span>
+            <select id="compareFirst" data-testid="compare-first" disabled></select>
+          </label>
+          <label class="field">
+            <span data-i18n="laterAttempt">较晚一次</span>
+            <select id="compareSecond" data-testid="compare-second" disabled></select>
+          </label>
+          <button id="compareBtn" class="button" type="button" data-testid="compare" disabled data-i18n="compare">对比</button>
+        </div>
+        <div id="compareStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div id="compareOutput" class="compare-output"></div>
+      </section>
+    </section>
+
+    <footer class="privacy-note">
+      <p><strong data-i18n="privacyTitle">隐私与恢复：</strong> <span data-i18n="privacyCopy">未提交草稿仅保存在当前浏览器会话。账号数据由服务保存，你可以随时导出或删除。</span></p>
+    </footer>
   </main>
 
-  <script src="/app.js"></script>
+  <dialog id="authDialog" class="modal" aria-labelledby="authTitle">
+    <div class="modal-head">
+      <div>
+        <p class="summary-kicker" data-i18n="account">账号</p>
+        <h2 id="authTitle" data-i18n="welcome">继续你的训练</h2>
+      </div>
+      <button id="closeAuthBtn" class="icon-button" type="button" aria-label="Close" data-i18n-aria="close">×</button>
+    </div>
+    <div class="auth-tabs" role="tablist" aria-label="Authentication mode">
+      <button id="loginTab" type="button" role="tab" aria-selected="true" aria-controls="loginForm" tabindex="0" data-i18n="login">登录</button>
+      <button id="registerTab" type="button" role="tab" aria-selected="false" aria-controls="registerForm" tabindex="-1" data-i18n="register">注册</button>
+    </div>
+    <div id="authStatus" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+    <form id="loginForm" class="auth-form" role="tabpanel" aria-labelledby="loginTab" tabindex="0">
+      <label class="field"><span data-i18n="username">用户名</span><input id="loginUsername" name="username" type="text" minlength="3" maxlength="50" autocomplete="username" required /></label>
+      <label class="field"><span data-i18n="password">密码</span><input id="loginPassword" name="password" type="password" minlength="10" maxlength="128" autocomplete="current-password" required /></label>
+      <button class="button button--primary" type="submit" data-testid="auth-login" data-i18n="login">登录</button>
+    </form>
+    <form id="registerForm" class="auth-form" role="tabpanel" aria-labelledby="registerTab" tabindex="0" hidden>
+      <label class="field"><span data-i18n="username">用户名</span><input id="registerUsername" name="username" type="text" minlength="3" maxlength="50" autocomplete="username" required aria-describedby="usernameHelp" /></label>
+      <small id="usernameHelp" class="field-hint" data-i18n="usernameHelp">3–50 个字符，使用字母、数字、下划线或短横线。</small>
+      <label class="field"><span data-i18n="password">密码</span><input id="registerPassword" name="password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required aria-describedby="passwordHelp" /></label>
+      <small id="passwordHelp" class="field-hint" data-i18n="passwordHelp">至少 10 个字符。</small>
+      <label class="field"><span data-i18n="confirmPassword">确认密码</span><input id="confirmPassword" type="password" minlength="10" maxlength="128" autocomplete="new-password" required /></label>
+      <button class="button button--primary" type="submit" data-testid="auth-register" data-i18n="createAccount">创建账号</button>
+    </form>
+    <p class="auth-privacy" data-i18n="authPrivacy">密码不会保存在浏览器中；登录状态由安全会话管理。</p>
+  </dialog>
+
+  <dialog id="confirmDialog" class="modal modal--confirm" aria-labelledby="confirmTitle">
+    <h2 id="confirmTitle">确认操作</h2>
+    <p id="confirmMessage"></p>
+    <div class="form-actions">
+      <button id="confirmCancelBtn" class="button" type="button" data-i18n="cancel">取消</button>
+      <button id="confirmActionBtn" class="button button--danger" type="button" data-i18n="confirm">确认</button>
+    </div>
+  </dialog>
+
+  <noscript><p class="noscript-note">JavaScript is required / 需要启用 JavaScript。</p></noscript>
+  <script src="/app.js" defer></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import com.gamingplatform.ai.ChallengeAiClient;
 import com.gamingplatform.ai.EvaluationAiClient;
 import com.gamingplatform.config.LangChain4jOpenAiProperties;
 import com.gamingplatform.dto.AiModeDebugResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import java.util.Arrays;
 
 @RestController
 @RequestMapping("/api/debug")
+@ConditionalOnProperty(name = "app.debug.enabled", havingValue = "true")
 public class DebugController {
 
     private final Environment environment;

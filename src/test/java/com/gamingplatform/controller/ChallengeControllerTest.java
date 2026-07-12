@@ -1,5 +1,8 @@
 package com.gamingplatform.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamingplatform.TestAuth;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -9,7 +12,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,10 +24,16 @@ class ChallengeControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
+    private TestAuth.AuthenticatedUser user;
+
+    @BeforeEach
+    void authenticate() throws Exception { user = TestAuth.register(mockMvc, objectMapper); }
 
     @Test
     void shouldGenerateChallenge() throws Exception {
         mockMvc.perform(post("/api/challenge/generate")
+                        .session(user.session()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"difficulty\":\"INTERMEDIATE\"}"))
                 .andExpect(status().isOk())
@@ -35,6 +46,7 @@ class ChallengeControllerTest {
     @Test
     void shouldGenerateChallengeFromCustomInputs() throws Exception {
         mockMvc.perform(post("/api/challenge/generate")
+                        .session(user.session()).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -51,7 +63,9 @@ class ChallengeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title", containsString("API Design")))
                 .andExpect(jsonPath("$.context", containsString("A fintech app is seeing slow balance lookups during market open.")))
+                .andExpect(jsonPath("$.context", not(containsString("gaming platform"))))
                 .andExpect(jsonPath("$.requirements[*]", hasItem("Include rollout metrics and monitoring checkpoints.")))
+                .andExpect(jsonPath("$.requirements[*]", not(hasItem(containsString("notification")))))
                 .andExpect(jsonPath("$.constraints[*]", hasItem("Must stay under 150ms p95.")))
                 .andExpect(jsonPath("$.acceptanceCriteria[*]", hasItem("Explain how success will be measured after rollout.")));
     }

@@ -10,6 +10,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
@@ -31,6 +33,22 @@ public class Challenge {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Difficulty difficulty;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_id")
+    private UserProfile createdBy;
+
+    @Column(name = "role_track", length = 80)
+    private String roleTrack;
+
+    @Column(name = "challenge_type", length = 120)
+    private String challengeType;
+
+    @Column(name = "focus_goal", length = 160)
+    private String focusGoal;
+
+    @Column(name = "generation_provider", length = 32)
+    private String generationProvider;
 
     @Column(nullable = false, length = 2000)
     private String context;
@@ -80,6 +98,26 @@ public class Challenge {
     public void setDifficulty(Difficulty difficulty) {
         this.difficulty = difficulty;
     }
+
+    public UserProfile getCreatedBy() { return createdBy; }
+
+    public void setCreatedBy(UserProfile createdBy) { this.createdBy = createdBy; }
+
+    public String getRoleTrack() { return roleTrack; }
+
+    public void setRoleTrack(String roleTrack) { this.roleTrack = roleTrack; }
+
+    public String getChallengeType() { return challengeType; }
+
+    public void setChallengeType(String challengeType) { this.challengeType = challengeType; }
+
+    public String getFocusGoal() { return focusGoal; }
+
+    public void setFocusGoal(String focusGoal) { this.focusGoal = focusGoal; }
+
+    public String getGenerationProvider() { return generationProvider; }
+
+    public void setGenerationProvider(String generationProvider) { this.generationProvider = generationProvider; }
 
     public String getContext() {
         return context;

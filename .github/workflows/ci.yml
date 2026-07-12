@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Verify application
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify -Pcontainer-tests
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: qa/e2e/package-lock.json
+
+      - name: Install browser QA dependencies
+        working-directory: qa/e2e
+        run: npm ci
+
+      - name: Type-check browser QA
+        working-directory: qa/e2e
+        run: npm run typecheck
+
+      - name: Install Chromium
+        working-directory: qa/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Start application for browser QA
+        run: |
+          java -jar target/ai-gamified-career-platform-0.0.1-SNAPSHOT.jar > app.log 2>&1 &
+          echo "APP_PID=$!" >> "$GITHUB_ENV"
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8080/actuator/health >/dev/null; then
+              exit 0
+            fi
+            if ! kill -0 "$!" 2>/dev/null; then
+              sed -n '1,240p' app.log
+              exit 1
+            fi
+            sleep 1
+          done
+          sed -n '1,240p' app.log
+          exit 1
+
+      - name: Run browser and accessibility QA
+        working-directory: qa/e2e
+        run: npm test
+
+      - name: Stop browser QA application
+        if: always()
+        run: |
+          if [ -n "${APP_PID:-}" ]; then
+            kill "$APP_PID" 2>/dev/null || true
+          fi
+
+      - name: Upload browser QA evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-qa-evidence
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            app.log
+            qa/e2e/playwright-report/
+            qa/e2e/test-results/
+
+      - name: Build production image
+        run: docker build --tag gameplatform:ci .

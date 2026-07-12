@@ -1,154 +1,236 @@
 package com.gamingplatform.service;
 
-import com.gamingplatform.ai.EvaluationAiClient;
-import com.gamingplatform.ai.EvaluationResult;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamingplatform.dto.AttemptComparisonResponse;
+import com.gamingplatform.dto.EvaluationResponse;
 import com.gamingplatform.dto.SubmissionRequest;
-import com.gamingplatform.dto.SubmissionResponse;
+import com.gamingplatform.dto.SubmissionStatusResponse;
 import com.gamingplatform.entity.Challenge;
 import com.gamingplatform.entity.Evaluation;
 import com.gamingplatform.entity.RubricDimension;
 import com.gamingplatform.entity.SalaryTier;
 import com.gamingplatform.entity.Submission;
-import com.gamingplatform.entity.UserProfile;
-import com.gamingplatform.exception.InvalidAiOutputException;
+import com.gamingplatform.entity.SubmissionStatus;
+import com.gamingplatform.exception.ConflictException;
+import com.gamingplatform.exception.NotFoundException;
 import com.gamingplatform.repository.EvaluationRepository;
 import com.gamingplatform.repository.SubmissionRepository;
-import com.gamingplatform.repository.UserProfileRepository;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.EnumMap;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class SubmissionService {
-
-    private static final Map<RubricDimension, Double> WEIGHTS = Map.of(
-            RubricDimension.REQUIREMENT_UNDERSTANDING, 0.25,
-            RubricDimension.LOGICAL_CLARITY, 0.20,
-            RubricDimension.TECHNICAL_FEASIBILITY, 0.25,
-            RubricDimension.EDGE_CASE_COVERAGE, 0.15,
-            RubricDimension.COMMUNICATION_STRUCTURE, 0.15
-    );
-
+    private final ChallengeService challenges;
+    private final SubmissionRepository submissions;
+    private final EvaluationRepository evaluations;
+    private final RecommendationService recommendations;
+    private final ApplicationEventPublisher events;
+    private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactions;
+    private final AiQuotaService aiQuotaService;
     private final UserService userService;
-    private final ChallengeService challengeService;
-    private final SubmissionRepository submissionRepository;
-    private final EvaluationRepository evaluationRepository;
-    private final UserProfileRepository userProfileRepository;
-    private final EvaluationAiClient evaluationAiClient;
-    private final RecommendationService recommendationService;
 
-    public SubmissionService(
-            UserService userService,
-            ChallengeService challengeService,
-            SubmissionRepository submissionRepository,
-            EvaluationRepository evaluationRepository,
-            UserProfileRepository userProfileRepository,
-            EvaluationAiClient evaluationAiClient,
-            RecommendationService recommendationService
-    ) {
+    public SubmissionService(ChallengeService challenges, SubmissionRepository submissions,
+                             EvaluationRepository evaluations, RecommendationService recommendations,
+                             ApplicationEventPublisher events, ObjectMapper objectMapper,
+                             PlatformTransactionManager transactionManager, AiQuotaService aiQuotaService,
+                             UserService userService) {
+        this.challenges = challenges;
+        this.submissions = submissions;
+        this.evaluations = evaluations;
+        this.recommendations = recommendations;
+        this.events = events;
+        this.objectMapper = objectMapper;
+        this.transactions = new TransactionTemplate(transactionManager);
+        this.aiQuotaService = aiQuotaService;
         this.userService = userService;
-        this.challengeService = challengeService;
-        this.submissionRepository = submissionRepository;
-        this.evaluationRepository = evaluationRepository;
-        this.userProfileRepository = userProfileRepository;
-        this.evaluationAiClient = evaluationAiClient;
-        this.recommendationService = recommendationService;
     }
 
-    @Transactional
-    public SubmissionResponse submit(SubmissionRequest request) {
-        UserProfile user = userService.getById(request.getUserId());
-        Challenge challenge = challengeService.getById(request.getChallengeId());
+    public SubmissionStatusResponse enqueue(Long userId, SubmissionRequest request, String headerKey) {
+        if (request == null) throw new IllegalArgumentException("Submission request is required");
+        String key = resolveKey(request.getIdempotencyKey(), headerKey);
+        Challenge challenge = challenges.getOwnedById(request.getChallengeId(), userId);
+        String answerHash = hash(challenge.getId() + "\n" + request.getAnswer());
 
-        Submission submission = new Submission();
-        submission.setUser(user);
-        submission.setChallenge(challenge);
-        submission.setAnswer(request.getAnswer());
-        submission = submissionRepository.save(submission);
-
-        EvaluationResult evaluationResult = evaluationAiClient.evaluate(challenge, request.getAnswer());
-        Map<RubricDimension, Double> rubricScores = normalizeScores(evaluationResult.rubricScores());
-
-        double finalScore = weightedFinalScore(rubricScores);
-
-        Evaluation evaluation = new Evaluation();
-        evaluation.setSubmission(submission);
-        evaluation.setRequirementUnderstanding(rubricScores.get(RubricDimension.REQUIREMENT_UNDERSTANDING));
-        evaluation.setLogicalClarity(rubricScores.get(RubricDimension.LOGICAL_CLARITY));
-        evaluation.setTechnicalFeasibility(rubricScores.get(RubricDimension.TECHNICAL_FEASIBILITY));
-        evaluation.setEdgeCaseCoverage(rubricScores.get(RubricDimension.EDGE_CASE_COVERAGE));
-        evaluation.setCommunicationStructure(rubricScores.get(RubricDimension.COMMUNICATION_STRUCTURE));
-        evaluation.setFinalScore(finalScore);
-        evaluation.setFeedback(evaluationResult.feedback());
-        evaluation = evaluationRepository.save(evaluation);
-
-        user.addXp((int) Math.round(finalScore));
-        userProfileRepository.save(user);
-
-        double averageScore = averageScore(user.getId());
-        SalaryTier salaryTier = SalaryTier.fromScore(averageScore);
-        String improvementTrack = recommendationService.buildImprovementTrack(rubricScores);
-
-        return new SubmissionResponse(
-                submission.getId(),
-                evaluation.getId(),
-                round2(finalScore),
-                salaryTier,
-                salaryTier.getTitle(),
-                toResponseScores(rubricScores),
-                evaluationResult.feedback(),
-                improvementTrack,
-                submission.getSubmittedAt()
-        );
-    }
-
-    private double weightedFinalScore(Map<RubricDimension, Double> rubricScores) {
-        double score = 0;
-        for (Map.Entry<RubricDimension, Double> weight : WEIGHTS.entrySet()) {
-            score += weight.getValue() * rubricScores.get(weight.getKey());
+        Long submissionId;
+        try {
+            submissionId = transactions.execute(status -> {
+                Submission existing = submissions.findByUser_IdAndIdempotencyKey(userId, key).orElse(null);
+                if (existing != null) {
+                    validateSamePayload(existing, challenge.getId(), answerHash);
+                    return existing.getId();
+                }
+                aiQuotaService.consume(userId, "evaluation", key);
+                Submission submission = new Submission();
+                submission.setUser(userService.getById(userId));
+                submission.setChallenge(challenge);
+                submission.setAnswer(request.getAnswer());
+                submission.setAnswerHash(answerHash);
+                submission.setIdempotencyKey(key);
+                submission.setStatus(SubmissionStatus.PENDING);
+                submission = submissions.saveAndFlush(submission);
+                events.publishEvent(new SubmissionQueuedEvent(submission.getId()));
+                return submission.getId();
+            });
+        } catch (DataIntegrityViolationException race) {
+            Submission existing = transactions.execute(status -> submissions
+                    .findByUser_IdAndIdempotencyKey(userId, key)
+                    .orElseThrow(() -> race));
+            validateSamePayload(existing, challenge.getId(), answerHash);
+            submissionId = existing.getId();
         }
-        return round2(score);
+        return get(userId, submissionId);
     }
 
-    private Map<RubricDimension, Double> normalizeScores(Map<RubricDimension, Double> scores) {
-        if (scores == null) {
-            throw new InvalidAiOutputException("Evaluator returned null rubric scores");
-        }
-
-        Map<RubricDimension, Double> normalized = new EnumMap<>(RubricDimension.class);
-        for (RubricDimension dimension : RubricDimension.values()) {
-            if (!scores.containsKey(dimension)) {
-                throw new InvalidAiOutputException("Evaluator missing score for " + dimension);
-            }
-            double value = clamp(scores.get(dimension), 0, 100);
-            normalized.put(dimension, round2(value));
-        }
-        return normalized;
+    public SubmissionStatusResponse get(Long userId, Long submissionId) {
+        return transactions.execute(status -> {
+            Submission submission = owned(userId, submissionId);
+            Evaluation evaluation = evaluations.findBySubmission_Id(submissionId).orElse(null);
+            return toResponse(submission, evaluation);
+        });
     }
 
-    private Map<String, Double> toResponseScores(Map<RubricDimension, Double> rubricScores) {
+    public List<SubmissionStatusResponse> history(Long userId) {
+        return transactions.execute(status -> submissions.findByUser_IdOrderBySubmittedAtDesc(userId).stream()
+                .map(submission -> toResponse(submission,
+                        evaluations.findBySubmission_Id(submission.getId()).orElse(null)))
+                .toList());
+    }
+
+    public List<SubmissionStatusResponse> attempts(Long userId, Long challengeId) {
+        challenges.getOwnedById(challengeId, userId);
+        return transactions.execute(status -> submissions
+                .findByChallenge_IdAndUser_IdOrderBySubmittedAtDesc(challengeId, userId).stream()
+                .map(submission -> toResponse(submission,
+                        evaluations.findBySubmission_Id(submission.getId()).orElse(null)))
+                .toList());
+    }
+
+    public AttemptComparisonResponse compare(Long userId, Long firstId, Long secondId) {
+        SubmissionStatusResponse first = get(userId, firstId);
+        SubmissionStatusResponse second = get(userId, secondId);
+        if (first.evaluation() == null || second.evaluation() == null) {
+            throw new IllegalArgumentException("Both attempts must be completed");
+        }
+        if (!first.challengeId().equals(second.challengeId())) {
+            throw new IllegalArgumentException("Attempts must belong to the same challenge");
+        }
+        Map<String, Double> deltas = new LinkedHashMap<>();
+        List<String> improved = new ArrayList<>();
+        List<String> declined = new ArrayList<>();
+        first.evaluation().rubricScores().forEach((dimension, score) -> {
+            double delta = round2(second.evaluation().rubricScores().getOrDefault(dimension, 0.0) - score);
+            deltas.put(dimension, delta);
+            if (delta > 0) improved.add(dimension);
+            if (delta < 0) declined.add(dimension);
+        });
+        return new AttemptComparisonResponse(first, second,
+                round2(second.evaluation().finalScore() - first.evaluation().finalScore()),
+                deltas, improved, declined);
+    }
+
+    private Submission owned(Long userId, Long id) {
+        return submissions.findByIdAndUser_Id(id, userId)
+                .orElseThrow(() -> new NotFoundException("Submission not found: " + id));
+    }
+
+    private SubmissionStatusResponse toResponse(Submission submission, Evaluation evaluation) {
+        EvaluationResponse evaluationResponse = evaluation == null ? null : evaluationResponse(evaluation);
+        return new SubmissionStatusResponse(submission.getId(), submission.getStatus(),
+                submission.getChallenge().getId(), submission.getChallenge().getTitle(),
+                submission.getIdempotencyKey(), submission.getSubmittedAt(), submission.getCompletedAt(),
+                submission.getErrorMessage(), evaluationResponse);
+    }
+
+    private EvaluationResponse evaluationResponse(Evaluation evaluation) {
+        Map<String, Double> scores = scores(evaluation);
+        Map<String, Double> weights = normalizeKeys(readMap(evaluation.getRubricWeightsJson()));
+        SalaryTier tier = SalaryTier.fromScore(evaluation.getFinalScore());
+        Map<RubricDimension, Double> recommendationScores = new java.util.EnumMap<>(RubricDimension.class);
+        recommendationScores.put(RubricDimension.REQUIREMENT_UNDERSTANDING, evaluation.getRequirementUnderstanding());
+        recommendationScores.put(RubricDimension.LOGICAL_CLARITY, evaluation.getLogicalClarity());
+        recommendationScores.put(RubricDimension.TECHNICAL_FEASIBILITY, evaluation.getTechnicalFeasibility());
+        recommendationScores.put(RubricDimension.EDGE_CASE_COVERAGE, evaluation.getEdgeCaseCoverage());
+        recommendationScores.put(RubricDimension.COMMUNICATION_STRUCTURE, evaluation.getCommunicationStructure());
+        return new EvaluationResponse(evaluation.getId(), round2(evaluation.getFinalScore()), tier,
+                tier.getTitle(), scores, weights, evaluation.getFeedback(), readList(evaluation.getStrengthsJson()),
+                readList(evaluation.getImprovementsJson()), evaluation.getExampleOutline(),
+                recommendations.buildImprovementTrack(recommendationScores), evaluation.getProvider());
+    }
+
+    private Map<String, Double> scores(Evaluation evaluation) {
         Map<String, Double> result = new LinkedHashMap<>();
-        result.put("requirement_understanding", rubricScores.get(RubricDimension.REQUIREMENT_UNDERSTANDING));
-        result.put("logical_clarity", rubricScores.get(RubricDimension.LOGICAL_CLARITY));
-        result.put("technical_feasibility", rubricScores.get(RubricDimension.TECHNICAL_FEASIBILITY));
-        result.put("edge_case_coverage", rubricScores.get(RubricDimension.EDGE_CASE_COVERAGE));
-        result.put("communication_structure", rubricScores.get(RubricDimension.COMMUNICATION_STRUCTURE));
+        result.put("requirement_understanding", evaluation.getRequirementUnderstanding());
+        result.put("logical_clarity", evaluation.getLogicalClarity());
+        result.put("technical_feasibility", evaluation.getTechnicalFeasibility());
+        result.put("edge_case_coverage", evaluation.getEdgeCaseCoverage());
+        result.put("communication_structure", evaluation.getCommunicationStructure());
         return result;
     }
 
-    private double averageScore(Long userId) {
-        Double average = evaluationRepository.findAverageFinalScoreByUserId(userId);
-        return average == null ? 0 : average;
+    private Map<String, Double> normalizeKeys(Map<String, Double> source) {
+        Map<String, Double> result = new LinkedHashMap<>();
+        source.forEach((key, value) -> result.put(key.toLowerCase(), value));
+        return result;
     }
 
-    private double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
+    private Map<String, Double> readMap(String json) {
+        try { return objectMapper.readValue(json, new TypeReference<>() {}); }
+        catch (Exception ex) { return Map.of(); }
     }
 
-    private double round2(double value) {
-        return Math.round(value * 100.0) / 100.0;
+    private List<String> readList(String json) {
+        try { return objectMapper.readValue(json, new TypeReference<>() {}); }
+        catch (Exception ex) { return List.of(); }
     }
+
+    private String resolveKey(String bodyKey, String headerKey) {
+        String body = normalizeKey(bodyKey);
+        String header = normalizeKey(headerKey);
+        if (body != null && header != null && !body.equals(header)) {
+            throw new ConflictException("Idempotency keys in header and body differ");
+        }
+        return body != null ? body : header != null ? header : UUID.randomUUID().toString();
+    }
+
+    private String normalizeKey(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.trim();
+        if (normalized.length() > 100) throw new IllegalArgumentException("Idempotency key is too long");
+        return normalized;
+    }
+
+    private void validateSamePayload(Submission existing, Long challengeId, String answerHash) {
+        boolean legacySentinel = "0".repeat(64).equals(existing.getAnswerHash());
+        boolean sameAnswer = legacySentinel ? hash(challengeId + "\n" + existing.getAnswer()).equals(answerHash)
+                : existing.getAnswerHash().equals(answerHash);
+        if (!existing.getChallenge().getId().equals(challengeId) || !sameAnswer) {
+            throw new ConflictException("Idempotency key was already used for a different submission");
+        }
+    }
+
+    private String hash(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private double round2(double value) { return Math.round(value * 100.0) / 100.0; }
 }
