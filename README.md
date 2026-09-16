@@ -1,3 +1,200 @@
+[English](#english) | [简体中文](#简体中文)
+
+<a id="english"></a>
+
+# English
+
+# AI Gamified Career Training Platform
+
+<img width="1209" height="926" alt="52121773002743_ pic" src="https://github.com/user-attachments/assets/1242cc46-d777-45ef-aaad-84ccfa45ec7a" />
+
+## What the project does
+
+An AI-powered platform for product management and software engineering interview practice.
+
+Users complete AI-generated practical challenges such as PRD writing, system design, and API design. The platform evaluates submitted answers and provides:
+
+- Scores across rubric dimensions
+- Actionable feedback
+- XP accumulation
+- Salary tier progression
+- Recommendations for interview preparation
+
+The current static frontend supports:
+
+- Quest Generator
+- Submit Answer
+- Automatic creation of the current session user through an implicit frontend call
+- Custom challenge inputs
+- Markdown rendering of challenge briefs and evaluation summaries
+
+The project addresses fragmented interview practice by providing tasks and actionable feedback that resemble real PM/SDE workflows.
+
+## Tech stack
+
+Backend:
+
+- Java 17
+- Spring Boot 3
+- Spring Web
+- Spring Data JPA
+- Bean Validation
+- Spring Boot Actuator
+
+Databases:
+
+- H2
+- PostgreSQL
+- MySQL
+
+AI layer:
+
+- LangChain4j
+- OpenAI
+- Local fallback mode for demonstrations without an API key
+
+Runtime and deployment:
+
+- Maven Wrapper
+- Docker
+- Docker Compose
+- Render
+
+## System architecture
+
+Overall flow:
+
+Frontend UI<br>
+-> REST API<br>
+-> AI orchestration layer<br>
+-> local heuristic engine / LangChain4j + OpenAI<br>
+-> relational database
+
+Current modules:
+
+- **Challenge generation:** generates context, requirements, constraints, and acceptance criteria; accepts `track`, `challengeType`, `focusGoal`, and `businessContext` inputs.
+- **Submission evaluation:** processes and evaluates submitted answers.
+- **Rubric scoring:** calculates the final score using weighted dimensions.
+- **Gamification:** manages XP and salary tier progression.
+- **Recommendation:** suggests interview preparation based on weaker areas.
+- **Deployment and debugging:** provides health checks, AI mode diagnostics, and profile configuration.
+
+Main endpoints:
+
+- `POST /api/user`
+- `POST /api/challenge/generate`
+- `POST /api/submission`
+- `GET /api/user/{id}/progress`
+- `GET /api/debug/ai-mode`
+- `POST /api/debug/ai-mode`
+- `GET /actuator/health`
+
+## Run locally
+
+### 1. Requirements
+
+- Java 17+
+- Docker, if you want to run PostgreSQL
+
+### 2. Install dependencies and run tests
+
+```bash
+./mvnw test
+```
+
+### 3. Simplest setup: H2 + local AI
+
+```bash
+./mvnw spring-boot:run
+```
+
+After startup, open:
+
+- `http://localhost:8080/`
+- `http://localhost:8080/actuator/health`
+- `http://localhost:8080/api/debug/ai-mode`
+
+Notes:
+
+- The default database is `H2`.
+- The default AI provider is `local`.
+- The homepage uses a simplified two-panel flow: `Quest Generator -> Submit Answer`.
+
+### 4. Run locally with PostgreSQL
+
+Start PostgreSQL:
+
+```bash
+docker compose up -d postgres
+```
+
+Then start the application:
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres \
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
+SPRING_DATASOURCE_USERNAME='gamingplatform' \
+SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+./mvnw spring-boot:run
+```
+
+`docker-compose.yml` exposes PostgreSQL on host port `5433` by default.
+
+### 5. Run with PostgreSQL + LangChain4j
+
+```bash
+SPRING_PROFILES_ACTIVE=postgres,langchain4j \
+SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5433/gamingplatform' \
+SPRING_DATASOURCE_USERNAME='gamingplatform' \
+SPRING_DATASOURCE_PASSWORD='gamingplatform' \
+OPENAI_API_KEY='your_openai_key' \
+OPENAI_MODEL='gpt-4o-mini' \
+./mvnw spring-boot:run
+```
+
+After startup, check the active mode:
+
+```bash
+curl http://localhost:8080/api/debug/ai-mode
+```
+
+The following response values indicate that LangChain4j is active:
+
+- `provider = langchain4j`
+- `challengeClient = LangChain4jChallengeAiClient`
+- `evaluationClient = LangChain4jEvaluationAiClient`
+
+### 6. Verify custom challenge inputs
+
+```bash
+curl -X POST http://localhost:8080/api/challenge/generate \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "difficulty":"INTERMEDIATE",
+    "roleTrack":"PM + SDE",
+    "challengeType":"API Design",
+    "focusGoal":"latency reduction and rollout safety",
+    "businessContext":"A fintech app is seeing slow balance lookups during market open.",
+    "customRequirements":["Include rollout metrics and monitoring checkpoints."],
+    "customConstraints":["Must stay under 150ms p95."],
+    "customAcceptanceCriteria":["Explain how success will be measured after rollout."]
+  }'
+```
+
+If the returned `title/context/requirements/constraints/acceptanceCriteria` include the custom information, the frontend-to-backend custom generation flow is working.
+
+## Additional documentation
+
+- Detailed design and deployment: `AI_Gamified_Career_Training_Platform_README.md`
+- Local environment variable template: `.env.example`
+- Local PostgreSQL configuration: `docker-compose.yml`
+
+---
+
+<a id="简体中文"></a>
+
+# 简体中文
+
 # AI Gamified Career Training Platform
 <img width="1209" height="926" alt="52121773002743_ pic" src="https://github.com/user-attachments/assets/1242cc46-d777-45ef-aaad-84ccfa45ec7a" />
 
@@ -63,10 +260,10 @@ AI 层：
 
 整体链路：
 
-Frontend UI  
--> REST API  
--> AI orchestration layer  
--> local heuristic engine / LangChain4j + OpenAI  
+Frontend UI<br>
+-> REST API<br>
+-> AI orchestration layer<br>
+-> local heuristic engine / LangChain4j + OpenAI<br>
 -> relational database
 
 当前模块划分：
