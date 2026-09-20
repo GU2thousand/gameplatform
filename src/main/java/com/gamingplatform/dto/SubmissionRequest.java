@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 
 public class SubmissionRequest {
 
-    @NotNull
     @Min(1)
     private Long userId;
 
@@ -40,6 +39,6 @@ public class SubmissionRequest {
     }
 
     public void setAnswer(String answer) {
-        this.answer = answer;
+        this.answer = answer == null ? null : answer.strip();
     }
 }

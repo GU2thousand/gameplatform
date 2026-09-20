@@ -20,12 +20,17 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleStatus(org.springframework.web.server.ResponseStatusException ex, HttpServletRequest request) {
+        return build(HttpStatus.valueOf(ex.getStatusCode().value()), ex.getReason(), request.getRequestURI());
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(NotFoundException ex, HttpServletRequest request) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI());
     }
 
-    @ExceptionHandler({InvalidAiOutputException.class, IllegalArgumentException.class})
+    @ExceptionHandler({InvalidAiOutputException.class, IllegalArgumentException.class, org.springframework.http.converter.HttpMessageNotReadableException.class})
     public ResponseEntity<ApiError> handleBadRequest(RuntimeException ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI());
     }

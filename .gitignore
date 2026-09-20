@@ -5,3 +5,6 @@ target/
 *.iml
 *.log
 .env
+data/
+*.mv.db
+*.trace.db

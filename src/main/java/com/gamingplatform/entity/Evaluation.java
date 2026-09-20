@@ -54,6 +54,12 @@ public class Evaluation {
         createdAt = Instant.now();
     }
 
+    @Column
+    private Integer xpAwarded;
+
+    public int getXpAwarded() { return xpAwarded == null ? 0 : xpAwarded; }
+    public void setXpAwarded(int value) { xpAwarded = value; }
+
     public Long getId() {
         return id;
     }

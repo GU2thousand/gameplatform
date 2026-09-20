@@ -14,7 +14,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
-@Table(name = "submissions")
+@Table(name = "submissions", uniqueConstraints = @jakarta.persistence.UniqueConstraint(name = "unique_submission_answer", columnNames = {"user_id", "challenge_id", "answer_hash"}))
 public class Submission {
 
     @Id
@@ -39,6 +39,12 @@ public class Submission {
     void onCreate() {
         submittedAt = Instant.now();
     }
+
+    @Column(name = "answer_hash", length = 64)
+    private String answerHash;
+
+    public String getAnswerHash() { return answerHash; }
+    public void setAnswerHash(String value) { answerHash = value; }
 
     public Long getId() {
         return id;

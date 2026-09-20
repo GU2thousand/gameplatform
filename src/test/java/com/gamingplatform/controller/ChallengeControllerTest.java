@@ -1,6 +1,8 @@
 package com.gamingplatform.controller;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import jakarta.servlet.http.Cookie;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,9 +22,19 @@ class ChallengeControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    private Cookie session;
+
+    @BeforeEach
+    void startSession() throws Exception {
+        var response = mockMvc.perform(post("/api/session").header("X-Requested-With", "career-platform")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        session = new Cookie("gp_session", response.getHeader("Set-Cookie").split(";", 2)[0].split("=", 2)[1]);
+    }
+
     @Test
     void shouldGenerateChallenge() throws Exception {
-        mockMvc.perform(post("/api/challenge/generate")
+        mockMvc.perform(post("/api/challenge/generate").cookie(session).header("X-Requested-With", "career-platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"difficulty\":\"INTERMEDIATE\"}"))
                 .andExpect(status().isOk())
@@ -34,7 +46,7 @@ class ChallengeControllerTest {
 
     @Test
     void shouldGenerateChallengeFromCustomInputs() throws Exception {
-        mockMvc.perform(post("/api/challenge/generate")
+        mockMvc.perform(post("/api/challenge/generate").cookie(session).header("X-Requested-With", "career-platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

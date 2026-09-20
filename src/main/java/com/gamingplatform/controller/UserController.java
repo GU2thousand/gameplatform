@@ -1,39 +1,34 @@
 package com.gamingplatform.controller;
 
-import com.gamingplatform.dto.CreateUserRequest;
 import com.gamingplatform.dto.UserProgressResponse;
-import com.gamingplatform.dto.UserResponse;
-import com.gamingplatform.entity.UserProfile;
+import com.gamingplatform.dto.ChallengeStateResponse;
+import com.gamingplatform.exception.NotFoundException;
+import com.gamingplatform.security.SessionService;
 import com.gamingplatform.service.ProgressService;
-import com.gamingplatform.service.UserService;
-import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.gamingplatform.service.WorkspaceService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
-
-    private final UserService userService;
-    private final ProgressService progressService;
-
-    public UserController(UserService userService, ProgressService progressService) {
-        this.userService = userService;
-        this.progressService = progressService;
+    private final ProgressService progress;
+    private final WorkspaceService workspace;
+    public UserController(ProgressService progress, WorkspaceService workspace) {
+        this.progress = progress; this.workspace = workspace;
     }
-
-    @PostMapping
-    public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
-        UserProfile user = userService.create(request.getUsername());
-        return new UserResponse(user.getId(), user.getUsername(), user.getXp());
+    @GetMapping("/me/progress")
+    public UserProgressResponse progress(HttpServletRequest request) {
+        return progress.getProgress(SessionService.currentUser(request));
     }
-
     @GetMapping("/{id}/progress")
-    public UserProgressResponse progress(@PathVariable("id") Long userId) {
-        return progressService.getProgress(userId);
+    public UserProgressResponse legacyProgress(@PathVariable Long id, HttpServletRequest request) {
+        if (!id.equals(SessionService.currentUser(request))) throw new NotFoundException("User not found");
+        return progress.getProgress(id);
+    }
+    @GetMapping("/me/history")
+    public List<ChallengeStateResponse> history(HttpServletRequest request) {
+        return workspace.history(SessionService.currentUser(request));
     }
 }

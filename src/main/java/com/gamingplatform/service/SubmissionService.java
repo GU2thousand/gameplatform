@@ -58,18 +58,38 @@ public class SubmissionService {
         this.recommendationService = recommendationService;
     }
 
-    @Transactional
-    public SubmissionResponse submit(SubmissionRequest request) {
-        UserProfile user = userService.getById(request.getUserId());
-        Challenge challenge = challengeService.getById(request.getChallengeId());
+    @Transactional(timeout = 240)
+    public SubmissionResponse submit(SubmissionRequest request, Long currentUserId) {
+        if (request.getUserId() != null && !request.getUserId().equals(currentUserId)) {
+            throw new com.gamingplatform.exception.NotFoundException("User not found");
+        }
+        // A database lock serializes awards across concurrent requests and server instances.
+        UserProfile user = userProfileRepository.lockById(currentUserId)
+                .orElseThrow(() -> new com.gamingplatform.exception.NotFoundException("User not found"));
+        Challenge challenge = challengeService.getOwned(request.getChallengeId(), currentUserId);
+        String answerHash = com.gamingplatform.security.SessionService.hash(request.getAnswer());
+        var previous = submissionRepository.findFirstByUser_IdAndChallenge_IdAndAnswerHash(currentUserId, challenge.getId(), answerHash);
+        if (previous.isPresent()) {
+            challenge.setDraftAnswer(request.getAnswer());
+            challenge.setActiveSubmissionId(previous.get().getId());
+            return response(evaluationRepository.findBySubmission_Id(previous.get().getId()).orElseThrow());
+        }
+        Double previousBest = evaluationRepository.findBestScore(currentUserId, challenge.getId());
 
         Submission submission = new Submission();
         submission.setUser(user);
         submission.setChallenge(challenge);
         submission.setAnswer(request.getAnswer());
+        submission.setAnswerHash(answerHash);
+        challenge.setDraftAnswer(request.getAnswer());
         submission = submissionRepository.save(submission);
+        challenge.setActiveSubmissionId(submission.getId());
 
         EvaluationResult evaluationResult = evaluationAiClient.evaluate(challenge, request.getAnswer());
+        if (evaluationResult == null || evaluationResult.feedback() == null || evaluationResult.feedback().isBlank()
+                || evaluationResult.feedback().length() > 5000) {
+            throw new InvalidAiOutputException("Evaluator returned invalid feedback");
+        }
         Map<RubricDimension, Double> rubricScores = normalizeScores(evaluationResult.rubricScores());
 
         double finalScore = weightedFinalScore(rubricScores);
@@ -83,26 +103,27 @@ public class SubmissionService {
         evaluation.setCommunicationStructure(rubricScores.get(RubricDimension.COMMUNICATION_STRUCTURE));
         evaluation.setFinalScore(finalScore);
         evaluation.setFeedback(evaluationResult.feedback());
+        int xpAwarded = Math.max(0, (int) Math.round(finalScore) - (int) Math.round(previousBest == null ? 0 : previousBest));
+        evaluation.setXpAwarded(xpAwarded);
         evaluation = evaluationRepository.save(evaluation);
 
-        user.addXp((int) Math.round(finalScore));
+        user.addXp(xpAwarded);
         userProfileRepository.save(user);
 
-        double averageScore = averageScore(user.getId());
-        SalaryTier salaryTier = SalaryTier.fromScore(averageScore);
-        String improvementTrack = recommendationService.buildImprovementTrack(rubricScores);
+        return response(evaluation);
+    }
 
-        return new SubmissionResponse(
-                submission.getId(),
-                evaluation.getId(),
-                round2(finalScore),
-                salaryTier,
-                salaryTier.getTitle(),
-                toResponseScores(rubricScores),
-                evaluationResult.feedback(),
-                improvementTrack,
-                submission.getSubmittedAt()
-        );
+    public SubmissionResponse response(Evaluation evaluation) {
+        Map<RubricDimension, Double> scores = new EnumMap<>(RubricDimension.class);
+        scores.put(RubricDimension.REQUIREMENT_UNDERSTANDING, evaluation.getRequirementUnderstanding());
+        scores.put(RubricDimension.LOGICAL_CLARITY, evaluation.getLogicalClarity());
+        scores.put(RubricDimension.TECHNICAL_FEASIBILITY, evaluation.getTechnicalFeasibility());
+        scores.put(RubricDimension.EDGE_CASE_COVERAGE, evaluation.getEdgeCaseCoverage());
+        scores.put(RubricDimension.COMMUNICATION_STRUCTURE, evaluation.getCommunicationStructure());
+        SalaryTier tier = SalaryTier.fromScore(evaluation.getFinalScore());
+        return new SubmissionResponse(evaluation.getSubmission().getId(), evaluation.getId(), evaluation.getFinalScore(),
+                tier, tier.getTitle(), toResponseScores(scores), evaluation.getFeedback(),
+                recommendationService.buildImprovementTrack(scores), evaluation.getSubmission().getSubmittedAt(), evaluation.getXpAwarded());
     }
 
     private double weightedFinalScore(Map<RubricDimension, Double> rubricScores) {
@@ -123,7 +144,9 @@ public class SubmissionService {
             if (!scores.containsKey(dimension)) {
                 throw new InvalidAiOutputException("Evaluator missing score for " + dimension);
             }
-            double value = clamp(scores.get(dimension), 0, 100);
+            Double raw = scores.get(dimension);
+            if (raw == null || !Double.isFinite(raw)) throw new InvalidAiOutputException("Evaluator returned non-finite score");
+            double value = clamp(raw, 0, 100);
             normalized.put(dimension, round2(value));
         }
         return normalized;

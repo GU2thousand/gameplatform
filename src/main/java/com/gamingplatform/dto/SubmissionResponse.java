@@ -14,6 +14,7 @@ public record SubmissionResponse(
         Map<String, Double> rubricScores,
         String feedback,
         String improvementTrack,
-        Instant submittedAt
+        Instant submittedAt,
+        int xpAwarded
 ) {
 }

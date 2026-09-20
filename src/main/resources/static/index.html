@@ -3,93 +3,121 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Career Training</title>
+  <title>Career Training</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <main class="app">
+  <main class="app" id="workspace">
     <header class="hero">
-      <p class="eyebrow">AI-Powered Interview Training</p>
-      <h1>AI Gamified Career Training Platform</h1>
-      <p class="hero-copy">Generate a focused quest, then submit your answer in one compact workflow.</p>
+      <p class="eyebrow" id="modeLabel">Checking training mode…</p>
+      <h1>Career Training Platform</h1>
+      <p class="hero-copy">Practice a focused quest, save your answer, and build on your feedback.</p>
+      <p class="mode-description" id="modeDescription">Loading the active training service.</p>
     </header>
 
-    <section class="panel panel--wide">
+    <div class="session-notice">Your work is saved on the server for this browser session. Keep this site's cookies to retain access; other browsers have separate progress.</div>
+    <p id="appStatus" class="status" role="status" aria-live="polite"></p>
+
+    <section class="panel panel--wide" aria-labelledby="generatorHeading">
       <div class="section-head">
         <div>
-          <h2>Quest Generator</h2>
-          <p>Use track, goal, business context, and custom requirements to shape the generated challenge.</p>
+          <h2 id="generatorHeading">Quest Generator</h2>
+          <p>Choose a track, goal, and context. Previous quests stay in your history.</p>
         </div>
-        <button id="generateBtn" class="button button--primary">Generate Quest</button>
+        <button id="generateBtn" class="button button--primary" type="button" disabled>Generate Quest</button>
       </div>
 
       <div class="form-grid">
         <label class="field">
           <span>Difficulty</span>
-          <select id="difficulty">
+          <select id="difficulty" disabled>
             <option value="BEGINNER">Beginner</option>
             <option value="INTERMEDIATE" selected>Intermediate</option>
             <option value="ADVANCED">Advanced</option>
           </select>
         </label>
-
         <label class="field">
           <span>Track</span>
-          <select id="roleTrack">
+          <select id="roleTrack" disabled>
             <option value="">General</option>
             <option value="PM">PM</option>
             <option value="SDE">SDE</option>
             <option value="PM + SDE">PM + SDE</option>
           </select>
         </label>
-
         <label class="field">
           <span>Challenge Type</span>
-          <input id="challengeType" type="text" placeholder="System Design, PRD, API Design" />
+          <input id="challengeType" type="text" maxlength="120" placeholder="System Design, PRD, API Design" disabled />
         </label>
-
         <label class="field">
           <span>Focus Goal</span>
-          <input id="focusGoal" type="text" placeholder="Latency reduction, tradeoff clarity, edge cases" />
+          <input id="focusGoal" type="text" maxlength="300" placeholder="Latency reduction, tradeoff clarity, edge cases" disabled />
         </label>
-
         <label class="field field--full">
           <span>Business Context</span>
-          <textarea id="businessContext" rows="4" placeholder="Describe the product, users, business pressure, or operational problem you want the quest to target."></textarea>
+          <textarea id="businessContext" rows="4" maxlength="1000" placeholder="Describe the product, users, or business problem you want to practice." disabled></textarea>
         </label>
-
-        <label class="field">
+        <label class="field field--full">
           <span>Custom Requirements</span>
-          <textarea id="customRequirements" rows="5" placeholder="One requirement per line"></textarea>
+          <textarea id="customRequirements" rows="4" aria-describedby="requirementsHelp" placeholder="One requirement per line" disabled></textarea>
+          <small id="requirementsHelp">Up to 12 non-empty lines, 400 characters per line.</small>
         </label>
       </div>
-
-      <pre id="challengeOutput" class="markdown-output"># No quest yet
-
-Generate a quest to see a clean challenge brief here.</pre>
+      <div id="challengeOutput" class="output-panel" tabindex="-1" role="region" aria-label="Current quest"><p>Loading your latest quest…</p></div>
     </section>
 
-    <section class="panel panel--submit">
+    <section class="panel panel--submit" aria-labelledby="answerHeading">
       <div class="section-head">
         <div>
-          <h2>Submit Answer</h2>
-          <p>Send the latest generated challenge and your response through the evaluator.</p>
+          <h2 id="answerHeading">Your Answer</h2>
+          <p>Your draft saves automatically. Improve your best score to earn more XP.</p>
         </div>
-        <button id="submitBtn" class="button">Submit Answer</button>
+        <button id="submitBtn" class="button" type="button" disabled>Submit Answer</button>
       </div>
-
       <label class="field">
         <span>Answer</span>
-        <textarea id="submissionAnswer" rows="10" placeholder="Write your PRD, system design, API design, or tradeoff analysis here. Minimum 30 characters."></textarea>
+        <textarea id="submissionAnswer" rows="10" minlength="30" maxlength="10000" aria-describedby="saveStatus answerCount" placeholder="Write your PRD, system design, API design, or tradeoff analysis here. Minimum 30 characters." disabled></textarea>
       </label>
-
-      <pre id="submissionOutput" class="markdown-output"># No submission yet
-
-Submit an answer to see the evaluation summary here.</pre>
+      <div class="save-row">
+        <div>
+          <p id="saveStatus" class="save-status" role="status" aria-live="polite">Loading saved answer…</p>
+          <p id="answerCount" class="answer-count">0 / 10,000 characters</p>
+        </div>
+        <button id="saveBtn" class="button" type="button" disabled>Save Draft</button>
+      </div>
+      <div id="submissionOutput" class="output-panel" role="region" aria-label="Evaluation result"><p>Loading your saved evaluation…</p></div>
     </section>
-  </main>
 
-  <script src="/app.js"></script>
+    <div class="dashboard-grid">
+      <section class="panel" aria-labelledby="progressHeading">
+        <div class="section-head">
+          <div>
+            <h2 id="progressHeading">Progress</h2>
+            <p>XP rewards improvement on each quest.</p>
+          </div>
+          <button id="refreshBtn" class="button" type="button" disabled>Refresh</button>
+        </div>
+        <dl class="progress-grid">
+          <div><dt>Total XP</dt><dd id="xpValue">—</dd></div>
+          <div><dt>Quests completed</dt><dd id="completedValue">—</dd></div>
+          <div><dt>Average score</dt><dd id="averageValue">—</dd></div>
+        </dl>
+        <p class="tier-value" id="tierValue">Loading progress…</p>
+        <h3>Practice next</h3>
+        <ul id="recommendations" class="recommendations"></ul>
+      </section>
+      <section class="panel" aria-labelledby="historyHeading">
+        <div class="section-head">
+          <div>
+            <h2 id="historyHeading">Quest History</h2>
+            <p>Resume any of your 20 most recent quests.</p>
+          </div>
+        </div>
+        <ul id="historyList" class="history-list"><li>Loading saved quests…</li></ul>
+      </section>
+    </div>
+  </main>
+  <script src="/app.js" defer></script>
 </body>
 </html>

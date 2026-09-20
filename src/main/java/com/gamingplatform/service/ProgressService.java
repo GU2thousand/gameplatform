@@ -39,7 +39,7 @@ public class ProgressService {
     @Transactional(readOnly = true)
     public UserProgressResponse getProgress(Long userId) {
         UserProfile user = userService.getById(userId);
-        long completed = submissionRepository.countByUser_Id(userId);
+        long completed = submissionRepository.countCompletedChallenges(userId);
 
         Double average = evaluationRepository.findAverageFinalScoreByUserId(userId);
         double averageScore = average == null ? 0 : average;

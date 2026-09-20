@@ -11,6 +11,11 @@ import java.util.List;
 
 public interface EvaluationRepository extends JpaRepository<Evaluation, Long> {
 
+    java.util.Optional<Evaluation> findBySubmission_Id(Long submissionId);
+
+    @Query("select max(e.finalScore) from Evaluation e where e.submission.user.id = :userId and e.submission.challenge.id = :challengeId")
+    Double findBestScore(@Param("userId") Long userId, @Param("challengeId") Long challengeId);
+
     @Query("select avg(e.finalScore) from Evaluation e where e.submission.user.id = :userId")
     Double findAverageFinalScoreByUserId(@Param("userId") Long userId);
 

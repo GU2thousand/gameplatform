@@ -21,7 +21,7 @@ class DebugControllerTest {
 
     @Test
     void shouldReportCurrentAiMode() throws Exception {
-        mockMvc.perform(post("/api/debug/ai-mode").contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/api/debug/ai-mode"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.provider").value("local"))
                 .andExpect(jsonPath("$.challengeClient").value("TemplateChallengeAiClient"))

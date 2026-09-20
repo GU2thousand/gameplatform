@@ -61,6 +61,23 @@ public class Challenge {
         createdAt = Instant.now();
     }
 
+    // Nullable for migration: legacy public/demo challenges remain unclaimed.
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    private UserProfile owner;
+
+    @Column(length = 10000)
+    private String draftAnswer;
+
+    private Long activeSubmissionId;
+    public Long getActiveSubmissionId() { return activeSubmissionId; }
+    public void setActiveSubmissionId(Long value) { activeSubmissionId = value; }
+
+    public UserProfile getOwner() { return owner; }
+    public void setOwner(UserProfile value) { owner = value; }
+    public String getDraftAnswer() { return draftAnswer == null ? "" : draftAnswer; }
+    public void setDraftAnswer(String value) { draftAnswer = value; }
+
     public Long getId() {
         return id;
     }

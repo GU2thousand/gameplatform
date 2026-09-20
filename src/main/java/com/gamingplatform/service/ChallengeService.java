@@ -16,18 +16,21 @@ public class ChallengeService {
 
     private final ChallengeAiClient challengeAiClient;
     private final ChallengeRepository challengeRepository;
+    private final UserService users;
 
-    public ChallengeService(ChallengeAiClient challengeAiClient, ChallengeRepository challengeRepository) {
+    public ChallengeService(ChallengeAiClient challengeAiClient, ChallengeRepository challengeRepository, UserService users) {
         this.challengeAiClient = challengeAiClient;
         this.challengeRepository = challengeRepository;
+        this.users = users;
     }
 
     @Transactional
-    public Challenge generate(ChallengeGenerationInput input) {
+    public com.gamingplatform.dto.ChallengeResponse generate(ChallengeGenerationInput input, Long userId) {
         GeneratedChallenge generated = challengeAiClient.generate(input);
         validateGeneratedChallenge(generated);
 
         Challenge challenge = new Challenge();
+        challenge.setOwner(users.getById(userId));
         challenge.setTitle(generated.title());
         challenge.setDifficulty(generated.difficulty());
         challenge.setContext(generated.context());
@@ -36,13 +39,19 @@ public class ChallengeService {
         challenge.setAcceptanceCriteria(generated.acceptanceCriteria());
         challenge.setExpectedOutputFormat(generated.expectedOutputFormat());
 
-        return challengeRepository.save(challenge);
+        return response(challengeRepository.save(challenge));
     }
 
     @Transactional(readOnly = true)
-    public Challenge getById(Long challengeId) {
-        return challengeRepository.findById(challengeId)
+    public Challenge getOwned(Long challengeId, Long userId) {
+        return challengeRepository.findByIdAndOwner_Id(challengeId, userId)
                 .orElseThrow(() -> new com.gamingplatform.exception.NotFoundException("Challenge not found: " + challengeId));
+    }
+
+    public static com.gamingplatform.dto.ChallengeResponse response(Challenge challenge) {
+        return new com.gamingplatform.dto.ChallengeResponse(challenge.getId(), challenge.getTitle(), challenge.getDifficulty(),
+                challenge.getContext(), List.copyOf(challenge.getRequirements()), List.copyOf(challenge.getConstraints()),
+                List.copyOf(challenge.getAcceptanceCriteria()), challenge.getExpectedOutputFormat(), challenge.getCreatedAt());
     }
 
     private void validateGeneratedChallenge(GeneratedChallenge generated) {
@@ -52,13 +61,17 @@ public class ChallengeService {
         if (isBlank(generated.title()) || isBlank(generated.context()) || isBlank(generated.expectedOutputFormat())) {
             throw new InvalidAiOutputException("Challenge payload missing required text fields");
         }
+        if (generated.difficulty() == null || generated.title().length() > 255 || generated.context().length() > 2000
+                || generated.expectedOutputFormat().length() > 64) {
+            throw new InvalidAiOutputException("Generated challenge exceeds supported field limits");
+        }
         validateList(generated.requirements(), "requirements");
         validateList(generated.constraints(), "constraints");
         validateList(generated.acceptanceCriteria(), "acceptanceCriteria");
     }
 
     private void validateList(List<String> values, String fieldName) {
-        if (values == null || values.isEmpty() || values.stream().anyMatch(this::isBlank)) {
+        if (values == null || values.isEmpty() || values.size() > 30 || values.stream().anyMatch(v -> isBlank(v) || v.length() > 500)) {
             throw new InvalidAiOutputException("Challenge payload has invalid " + fieldName);
         }
     }

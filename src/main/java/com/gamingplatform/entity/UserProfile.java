@@ -32,6 +32,16 @@ public class UserProfile {
         createdAt = Instant.now();
     }
 
+    @Column(unique = true, length = 64)
+    private String sessionTokenHash;
+
+    private Instant sessionExpiresAt;
+
+    public String getSessionTokenHash() { return sessionTokenHash; }
+    public void setSessionTokenHash(String value) { sessionTokenHash = value; }
+    public Instant getSessionExpiresAt() { return sessionExpiresAt; }
+    public void setSessionExpiresAt(Instant value) { sessionExpiresAt = value; }
+
     public Long getId() {
         return id;
     }

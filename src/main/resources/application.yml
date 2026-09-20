@@ -2,7 +2,7 @@ spring:
   application:
     name: ai-gamified-career-platform
   datasource:
-    url: jdbc:h2:mem:gamingplatform;MODE=MYSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:./data/gamingplatform;MODE=MYSQL;DB_CLOSE_ON_EXIT=FALSE}
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -12,7 +12,7 @@ spring:
     open-in-view: false
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
 
 logging:
@@ -20,6 +20,8 @@ logging:
     org.springframework.web: INFO
 
 app:
+  session:
+    cookie-secure: ${APP_SESSION_COOKIE_SECURE:false}
   ai:
     provider: ${APP_AI_PROVIDER:local}
     langchain4j:

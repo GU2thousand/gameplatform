@@ -118,46 +118,39 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
     @Override
     public GeneratedChallenge generate(ChallengeGenerationInput input) {
         Difficulty difficulty = input == null ? Difficulty.INTERMEDIATE : input.resolvedDifficulty();
-        List<GeneratedChallenge> candidates = BANK.getOrDefault(difficulty, BANK.get(Difficulty.INTERMEDIATE));
-        int index = Math.floorMod(counter.getAndIncrement(), candidates.size());
-        GeneratedChallenge base = candidates.get(index);
-
         if (input == null || !input.hasCustomPrompt()) {
-            return base;
+            List<GeneratedChallenge> candidates = BANK.getOrDefault(difficulty, BANK.get(Difficulty.INTERMEDIATE));
+            int index = Math.floorMod(counter.getAndIncrement(), candidates.size());
+            return candidates.get(index);
         }
 
+        // A custom brief is built only from its own inputs, never from an unrelated bank entry.
         return new GeneratedChallenge(
-                buildTitle(base, input),
+                buildTitle(input),
                 difficulty,
-                buildContext(base.context(), input),
-                mergeSection(base.requirements(), derivedRequirements(input), input.customRequirementsOrEmpty()),
-                mergeSection(base.constraints(), derivedConstraints(input), input.customConstraintsOrEmpty()),
-                mergeSection(base.acceptanceCriteria(), derivedAcceptanceCriteria(input), input.customAcceptanceCriteriaOrEmpty()),
-                base.expectedOutputFormat()
+                buildContext(input),
+                mergeSection(derivedRequirements(input), input.customRequirementsOrEmpty()),
+                mergeSection(derivedConstraints(input), input.customConstraintsOrEmpty()),
+                mergeSection(derivedAcceptanceCriteria(input), input.customAcceptanceCriteriaOrEmpty()),
+                "Markdown"
         );
     }
 
-    private String buildTitle(GeneratedChallenge base, ChallengeGenerationInput input) {
+    private String buildTitle(ChallengeGenerationInput input) {
         String challengeType = normalize(input.challengeType());
         String focusGoal = normalize(input.focusGoal());
         String businessContext = normalize(input.businessContext());
-
-        if (hasText(challengeType) && hasText(businessContext)) {
-            return challengeType + ": " + summarize(businessContext);
+        String title = challengeType == null ? "Custom Career Practice" : challengeType;
+        String subject = businessContext == null ? focusGoal : businessContext;
+        if (subject != null) {
+            title += ": " + abbreviate(subject, 100);
+        } else {
+            title += " Challenge";
         }
-        if (hasText(challengeType) && hasText(focusGoal)) {
-            return challengeType + ": " + focusGoal;
-        }
-        if (hasText(challengeType)) {
-            return "Custom " + challengeType + " Challenge";
-        }
-        if (hasText(focusGoal)) {
-            return base.title() + " - " + focusGoal;
-        }
-        return base.title();
+        return abbreviate(title, 255);
     }
 
-    private String buildContext(String baseContext, ChallengeGenerationInput input) {
+    private String buildContext(ChallengeGenerationInput input) {
         List<String> sections = new ArrayList<>();
 
         if (hasText(input.businessContext())) {
@@ -178,8 +171,10 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
             sections.add("Requested setup: " + String.join(", ", setup) + ".");
         }
 
-        sections.add(baseContext);
-        return String.join(" ", sections);
+        if (sections.isEmpty()) {
+            sections.add("Complete a career practice exercise using the supplied requirements, constraints, and acceptance criteria.");
+        }
+        return abbreviate(String.join(" ", sections), 2000);
     }
 
     private List<String> derivedRequirements(ChallengeGenerationInput input) {
@@ -193,31 +188,33 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
         if (hasText(input.focusGoal())) {
             derived.add("Explicitly address this requested focus: " + input.focusGoal().trim());
         }
+        derived.add("Describe the proposed approach and explain the decisions needed to meet the supplied brief.");
         return derived;
     }
 
     private List<String> derivedConstraints(ChallengeGenerationInput input) {
         List<String> derived = new ArrayList<>();
         if (hasText(input.businessContext())) {
-            derived.add("Keep the proposal grounded in this business context: " + summarize(input.businessContext()));
+            derived.add("Keep the proposal grounded in this business context: " + abbreviate(input.businessContext().trim(), 400));
         }
+        derived.add("State any assumptions and distinguish them from the requirements supplied in the brief.");
         return derived;
     }
 
     private List<String> derivedAcceptanceCriteria(ChallengeGenerationInput input) {
         List<String> derived = new ArrayList<>();
         if (hasText(input.focusGoal())) {
-            derived.add("The final answer clearly covers the requested focus area.");
+            derived.add("Explain how the proposed solution achieves this goal: " + input.focusGoal().trim());
         }
         if (!input.customRequirementsOrEmpty().isEmpty()) {
             derived.add("The solution traces back to the user-provided custom requirements.");
         }
+        derived.add("Explain tradeoffs, relevant edge cases, and how the proposed outcome will be verified.");
         return derived;
     }
 
-    private List<String> mergeSection(List<String> base, List<String> derived, List<String> custom) {
+    private List<String> mergeSection(List<String> derived, List<String> custom) {
         LinkedHashSet<String> merged = new LinkedHashSet<>();
-        addAll(merged, base);
         addAll(merged, derived);
         addAll(merged, custom);
         return new ArrayList<>(merged);
@@ -230,17 +227,20 @@ public class TemplateChallengeAiClient implements ChallengeAiClient {
         for (String value : values) {
             String normalized = normalize(value);
             if (normalized != null) {
-                target.add(normalized);
+                target.add(abbreviate(normalized, 500));
             }
         }
     }
 
-    private String summarize(String value) {
-        String normalized = normalize(value);
-        if (normalized == null) {
-            return "";
+    private String abbreviate(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
         }
-        return normalized.length() <= 72 ? normalized : normalized.substring(0, 69) + "...";
+        int end = maxLength - 3;
+        if (Character.isHighSurrogate(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(0, end) + "...";
     }
 
     private String normalize(String value) {

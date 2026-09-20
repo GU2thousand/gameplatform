@@ -8,13 +8,20 @@ import java.util.List;
 public class ChallengeGenerateRequest {
 
     private Difficulty difficulty = Difficulty.INTERMEDIATE;
+    @jakarta.validation.constraints.Size(max = 120)
     private String roleTrack;
+    @jakarta.validation.constraints.Size(max = 120)
     private String challengeType;
+    @jakarta.validation.constraints.Size(max = 300)
     private String focusGoal;
+    @jakarta.validation.constraints.Size(max = 1000)
     private String businessContext;
-    private List<String> customRequirements = new ArrayList<>();
-    private List<String> customConstraints = new ArrayList<>();
-    private List<String> customAcceptanceCriteria = new ArrayList<>();
+    @jakarta.validation.constraints.Size(max = 12)
+    private List<@jakarta.validation.constraints.Size(max = 400) String> customRequirements = new ArrayList<>();
+    @jakarta.validation.constraints.Size(max = 12)
+    private List<@jakarta.validation.constraints.Size(max = 400) String> customConstraints = new ArrayList<>();
+    @jakarta.validation.constraints.Size(max = 12)
+    private List<@jakarta.validation.constraints.Size(max = 400) String> customAcceptanceCriteria = new ArrayList<>();
 
     public Difficulty getDifficulty() {
         return difficulty;
