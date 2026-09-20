@@ -9,6 +9,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.mockito.MockedStatic;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +62,31 @@ class SubmissionFlowIntegrationTest {
     private JsonNode progress(Cookie cookie) throws Exception {
         return json.readTree(mvc.perform(get("/api/user/me/progress").cookie(cookie))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    @Test void nanosecondClockProducesIdenticalFirstAndPersistedResponses() throws Exception {
+        Cookie cookie = session();
+        Instant second = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        // Exercise both sides of the database's microsecond rounding boundary.
+        for (int nanos : new int[]{123456123, 123456789}) {
+            Instant timestamp = second.plusNanos(nanos);
+            String expected = timestamp.truncatedTo(ChronoUnit.MICROS).toString();
+            try (MockedStatic<Instant> clock = mockStatic(Instant.class, CALLS_REAL_METHODS)) {
+                clock.when(Instant::now).thenReturn(timestamp);
+                JsonNode generated = json.readTree(mvc.perform(post("/api/challenge/generate").cookie(cookie)
+                                .header("X-Requested-With", "career-platform").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                assertThat(generated.get("createdAt").asText()).isEqualTo(expected);
+                long id = generated.get("id").asLong();
+                JsonNode first = submit(cookie, id, ANSWER);
+                assertThat(first.get("submittedAt").asText()).isEqualTo(expected);
+                assertThat(submit(cookie, id, ANSWER)).isEqualTo(first);
+                JsonNode restored = json.readTree(mvc.perform(get("/api/challenge/{id}", id).cookie(cookie))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                assertThat(restored.get("challenge")).isEqualTo(generated);
+                assertThat(restored.get("result")).isEqualTo(first);
+            }
+        }
     }
 
     @Test void draftResultHistoryAndProgressRestoreFromServer() throws Exception {

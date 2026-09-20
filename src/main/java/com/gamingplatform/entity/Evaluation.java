@@ -12,6 +12,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "evaluations")
@@ -51,7 +52,8 @@ public class Evaluation {
 
     @PrePersist
     void onCreate() {
-        createdAt = Instant.now();
+        // Match timestamp(6) storage before returning the newly persisted entity.
+        createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     @Column

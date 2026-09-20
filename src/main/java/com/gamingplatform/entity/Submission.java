@@ -12,6 +12,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "submissions", uniqueConstraints = @jakarta.persistence.UniqueConstraint(name = "unique_submission_answer", columnNames = {"user_id", "challenge_id", "answer_hash"}))
@@ -37,7 +38,8 @@ public class Submission {
 
     @PrePersist
     void onCreate() {
-        submittedAt = Instant.now();
+        // Match timestamp(6) storage before returning the newly persisted entity.
+        submittedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     @Column(name = "answer_hash", length = 64)
